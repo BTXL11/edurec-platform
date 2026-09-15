@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -42,10 +43,8 @@ type CrawlImportResult struct {
 	CreatedCategories int `json:"created_categories"`
 }
 
-// 各来源在资源表里的固定 type；model.Resource.Type 允许 course / article / video
-const (
-	bilibiliResourceType = "video"
-)
+// B 站视频在资源表里的固定 type
+const bilibiliResourceType = model.ResourceTypeVideo
 
 // bilibiliSourceTemplate 与 crawler/collect.py 的 SOURCE_URL_TEMPLATE 保持一致。
 // comment.go 依赖它从 source_url 反解 BV 号，不要改动其值。
@@ -163,6 +162,12 @@ func (s *CrawlImportService) ImportItems(
 	opts CrawlImportOptions,
 	write bool,
 ) (*CrawlImportResult, []model.Resource, error) {
+	// 写库前的最后一道闸：类型非法时宁可不导入，也不要写进枚举外的值
+	if !model.IsValidResourceType(opts.ResourceType) {
+		return nil, nil, apperror.BadRequest(
+			fmt.Sprintf("资源类型 %q 非法，只能是 course / article / video", opts.ResourceType))
+	}
+
 	result := &CrawlImportResult{}
 	records := make([]crawlRecord, 0, len(items))
 	for _, item := range items {
