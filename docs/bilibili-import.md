@@ -3,6 +3,11 @@
 平台的第二条内容来源：用 Python 采集 B 站公开视频元数据 → 输出 JSON → Go 命令导入 `resources` 表 →
 前端资源列表自然展示。视频以 `type=video` 的普通资源身份**混入现有列表**，不新增专区、不改动推荐链路。
 
+> 慕课等第三方数据集走**完全不同的链路**（纯离线导入，配置驱动字段映射），见
+> [dataset-import.md](./dataset-import.md)。两条链路复用同一段落库内核
+> （[crawl_import.go](../backend/internal/service/crawl_import.go) 的 `ImportItems`），
+> 故下文的判重与幂等语义对二者同样成立。
+
 链路分两种模式，**离线批量 + 在线实时并存**：
 
 ```
