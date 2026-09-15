@@ -57,7 +57,9 @@ func LoadDataset(cfg config.DatasetConfig) (*DatasetLoadResult, error) {
 	// 列名/字段名多出一个 U+FEFF 前缀，导致映射静默取不到值
 	raw, err := os.ReadFile(cfg.File)
 	if err != nil {
-		return nil, apperror.Internal(err)
+		// 路径写错是最常见的失败，报错要直接点名是哪个文件；
+		// 这属于配置问题而非服务端故障，故按 BadRequest 而非 Internal 返回
+		return nil, apperror.BadRequest(fmt.Sprintf("读取数据集文件 %q 失败: %v", cfg.File, err))
 	}
 	data := bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF})
 

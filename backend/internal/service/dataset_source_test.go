@@ -297,9 +297,16 @@ func TestLoadDatasetRejectsBadItemsPath(t *testing.T) {
 }
 
 func TestLoadDatasetMissingFileReturnsError(t *testing.T) {
-	cfg := moocDataset(filepath.Join(t.TempDir(), "not-exist.json"))
+	missing := filepath.Join(t.TempDir(), "not-exist.json")
+	cfg := moocDataset(missing)
 
-	if _, err := service.LoadDataset(cfg); err == nil {
+	_, err := service.LoadDataset(cfg)
+
+	if err == nil {
 		t.Fatal("文件不存在，期望报错")
+	}
+	// 路径配错是最常见的失败，报错必须点名是哪个文件，否则无从下手
+	if !strings.Contains(err.Error(), missing) {
+		t.Fatalf("error = %v, want 带上出错的文件路径", err)
 	}
 }
