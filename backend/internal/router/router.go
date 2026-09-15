@@ -38,7 +38,7 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	ratingService := service.NewRatingService(ratingRepo, resourceRepo)
 
 	// 在线 B 站采集：搜索落库 + 评论抓取（复用离线导入服务，filePath 仅离线导入用）
-	bilibiliImportService := service.NewBilibiliImportService(resourceRepo, categoryRepo, "")
+	bilibiliImportService := service.NewCrawlImportService(resourceRepo, categoryRepo, "")
 	bilibiliOnlineService := service.NewBilibiliOnlineService(bilibiliImportService, cfg.Bilibili)
 	resourceService.SetBilibiliOnline(bilibiliOnlineService)
 	commentService := service.NewCommentService(commentRepo, bilibiliOnlineService, cfg.Bilibili.CommentLimit)

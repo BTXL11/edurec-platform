@@ -33,13 +33,13 @@ func main() {
 		log.Fatalf("MySQL 初始化失败: %v", err)
 	}
 
-	svc := service.NewBilibiliImportService(
+	svc := service.NewCrawlImportService(
 		repository.NewResourceRepository(db),
 		repository.NewCategoryRepository(db),
 		*filePath,
 	)
 
-	var result *service.BilibiliImportResult
+	var result *service.CrawlImportResult
 	if *dryRun {
 		result, err = svc.Preview()
 	} else {
