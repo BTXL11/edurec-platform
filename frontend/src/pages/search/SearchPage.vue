@@ -30,9 +30,10 @@ const canCrawlOnline = computed(
   () => !!keyword.value.trim() && !categoryId.value && !type.value && !tags.value.trim(),
 )
 
-// 带关键词的搜索在本地无结果时会同步触发 B 站爬取，耗时数秒，用文案提示
+// 带关键词的搜索在本地无结果时会同步触发外部来源抓取（目前是 B 站），耗时数秒，用文案提示。
+// 不写死具体来源：将来接入别的在线来源时这里不用跟着改。
 const loadingText = computed(() =>
-  keyword.value.trim() ? '正在搜索，本地无结果时会自动检索 B 站，请稍候…' : '加载中…',
+  keyword.value.trim() ? '正在搜索，本地无结果时会自动检索外部内容，请稍候…' : '加载中…',
 )
 
 const sentinel = ref<HTMLElement | null>(null)

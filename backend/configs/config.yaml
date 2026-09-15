@@ -38,9 +38,11 @@ bilibili:
   python_path: "python"
   crawler_dir: "crawler"
   category: "B站视频"
-  search_limit: 10
-  # 无限滚动时最多翻多少页 B 站结果，防无界爬取
-  search_max_pages: 5
+  # 单次搜索导入条数，也就是前端滚到底后续爬一次追加的条数
+  search_limit: 20
+  # 无限滚动时最多翻多少页 B 站结果，防无界爬取。
+  # 单个关键词的总上限 = search_limit × search_max_pages = 20 × 10 = 200 条
+  search_max_pages: 10
   comment_limit: 20
 
 # 第三方数据集导入（cmd/import_dataset）。各家数据集的字段名和格式都不一样，
