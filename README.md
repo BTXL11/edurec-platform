@@ -10,13 +10,52 @@
 
 ## 快速开始
 
-```bash
-# 后端（需 MySQL/Redis，配置见 backend/configs/config.yaml）
-cd backend && go run ./cmd/server
+### 一键运行（推荐）
 
-# 前端（dev 默认 VITE_MOCK=1，走 mock 可脱离后端）
-cd frontend && pnpm install && pnpm dev
+前置（仅首次）：Docker 可用；engine 依赖已装（`cd ../edurec-engine && pip install -e .[dev]`）。
+
+```bash
+# ① 一键启动（起容器 → 播种 → 后端 :8080 → 前端 :5173）
+bash scripts/start.sh
+
+# ② 刷新个性化推荐（导出快照 → engine 训练/推理 → 导入缓存表）
+bash scripts/handoff.sh
+
+# ③ 收工
+bash scripts/stop.sh            # 只停后端/前端
+bash scripts/stop.sh --with-db  # 连数据库容器一起停
 ```
+
+浏览器打开 http://localhost:5173，登录 `demo1` / `demo123456`（管理员 `demo_admin` / `demo123456`）。
+三个脚本均幂等，可重复执行。
+
+### 手动运行
+
+```bash
+# ① 起数据库容器（需 Docker）
+docker run -d --name edurec-mysql -p 3306:3306 \
+  -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=edurec mysql:8
+docker run -d --name edurec-redis -p 6379:6379 redis:7
+
+# ② 播种演示数据（先拷 engine 模拟数据，保证 ID 对齐）
+cd backend
+cp -r ../edurec-engine/dataset/sim data/sim
+CONFIG_PATH=configs/config.yaml go run ./cmd/demo_seed -with-behaviors
+
+# ③ 起后端（另开终端，监听 :8080）
+CONFIG_PATH=configs/config.yaml go run ./cmd/server
+
+# ④ 起前端（另开终端，监听 :5173；默认 VITE_MOCK=1 走 mock，连真实后端改 VITE_MOCK=0）
+cd ../frontend && pnpm install && pnpm dev
+```
+
+### 脚本
+
+| 脚本 | 作用 |
+|---|---|
+| `scripts/start.sh` | 一键启动：容器 → 播种 → 后端 → 前端（幂等） |
+| `scripts/stop.sh [--with-db]` | 停止服务；`--with-db` 连容器一起停 |
+| `scripts/handoff.sh [--infer-only]` | 推荐刷新：导出 → 训练 → 推理 → 导入；`--infer-only` 跳过训练 |
 
 ## 推荐闭环（engine 离线批量训练 → 结果落库）
 

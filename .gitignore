@@ -3,3 +3,4 @@ temp/
 data/
 backend/configs/config.local.yaml
 backend/configs/config.demo.yaml
+scripts/.run/

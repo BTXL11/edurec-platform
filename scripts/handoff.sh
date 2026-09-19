@@ -9,7 +9,7 @@
 #
 # 前置条件：
 #   1. 后端服务器已启动（第 ⑥ 步经 HTTP 导入，需管理员账号）
-#   2. engine 已安装依赖（python 可执行，且 `python -m scripts.train_all` 可导入）
+#   2. engine 已安装依赖（.venv 存在，即已 pip install -e .[dev]）
 #
 # 用法：
 #   bash scripts/handoff.sh                 # 完整一轮：导出 + 训练 + 推理 + 导入
@@ -31,6 +31,7 @@ PLATFORM_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BACKEND_DIR="$PLATFORM_ROOT/backend"
 
 ENGINE_ROOT="${ENGINE_ROOT:-$PLATFORM_ROOT/../edurec-engine}"
+ENGINE_PYTHON="$ENGINE_ROOT/.venv/bin/python"
 CONFIG_PATH="${CONFIG_PATH:-configs/config.yaml}"
 SNAPSHOT_DIR="${SNAPSHOT_DIR:-data/snapshots}"
 BASE_URL="${BASE_URL:-http://localhost:8080}"
@@ -52,6 +53,7 @@ die() { printf '\033[1;31m[handoff][错误]\033[0m %s\n' "$*" >&2; exit 1; }
 
 # ---- 前置检查 ---------------------------------------------------------------
 [ -d "$ENGINE_ROOT" ] || die "engine 目录不存在: $ENGINE_ROOT（可用 ENGINE_ROOT 覆盖）"
+[ -x "$ENGINE_PYTHON" ] || die "engine 依赖未安装: $ENGINE_ROOT/.venv/bin/python（先 cd $ENGINE_ROOT && pip install -e .[dev]）"
 [ -d "$BACKEND_DIR" ] || die "backend 目录不存在: $BACKEND_DIR"
 
 # ① 导出快照
@@ -70,7 +72,7 @@ cp -r "$BACKEND_DIR/$SNAPSHOT_DIR/$run_id" "$ENGINE_ROOT/dataset/platform_snapsh
 # ③ 训练（--infer-only 跳过）
 if [ "$INFER_ONLY" -eq 0 ]; then
   log "③ engine 训练 (train_all)"
-  ( cd "$ENGINE_ROOT" && python -m scripts.train_all \
+  ( cd "$ENGINE_ROOT" && "$ENGINE_PYTHON" -m scripts.train_all \
       --data-source platform --snapshot-dir "dataset/platform_snapshot/$run_id" )
 else
   log "③ 跳过训练（--infer-only，复用 model/models.pt）"
@@ -78,7 +80,7 @@ fi
 
 # ④ 全量推理
 log "④ engine 全量推理 (run_batch_infer)"
-( cd "$ENGINE_ROOT" && python -m scripts.run_batch_infer \
+( cd "$ENGINE_ROOT" && "$ENGINE_PYTHON" -m scripts.run_batch_infer \
     --data-source platform --snapshot-dir "dataset/platform_snapshot/$run_id" )
 
 # ⑤ 推理结果放回 platform
