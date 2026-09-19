@@ -23,12 +23,15 @@
 
 | 角色 | 账号 | 密码 | 说明 |
 |---|---|---|---|
-| 演示用户（已有个性化推荐） | `demo1` | `demo123456` | users.id=1，`recommendations` 表命中 engine 导入结果 |
-| 演示用户（新注册，走兜底） | `demo_fresh` | `demo123456` | users.id=2001，演示前清空它的推荐缓存行（见 1.8 节），用来演示热门兜底 |
-| 演示管理员 | `demo_admin` | `demo123456` | users.id=2000，`admins` 表有行，管理后台 `/admin` 用 |
+| 演示用户（无缓存行，走兜底） | `demo_fresh` | `demo123456` | users.id=2001，**没有**推荐缓存行 → 首页走热门兜底并回写。见 1.8 节 |
+| 演示管理员 | `demo_admin` | `demo123456` | users.id=2000，`admins` 表有行；管理后台 `/admin`；**同时也有缓存行**，可演个性化读取 |
 
-> ⚠️ `demo<数字>` 的用户名与 `users.id` **并非一一对应**：`id 2 = BTXL`、`id 3 = biliverify`（密码不是 `demo123456`），
-> 从 `id 4` 起才是 `demo4`。演示只用上面三个账号，最稳。
+> ⚠️ **2026-09-19 变更：模拟数据已彻底清除**。按你的要求"页面里不要有模拟资源"，
+> 已删除 `模拟资源*`（347 条）、模拟用户 `demo0..demo1999`、`模拟类别*` 分类，及其行为/评分/推荐缓存。
+> **`demo1` 等 `demo<数字>` 账号已不存在**（它们是模拟数据的一部分），别再写进演示里。
+> 库里现在只有 **4 个真实用户**：`BTXL`(id 2)、`biliverify`(id 3)、`demo_admin`(id 2000)、`demo_fresh`(id 2001)。
+> `BTXL` / `biliverify` 是真实注册用户，**密码不是 `demo123456`**，不要拿来演示登录。
+> 因此**新注册** `demo_fresh`（见 1.8 节命令）就是最干净的演示账号。
 
 ---
 
@@ -125,24 +128,23 @@ SELECT COUNT(*) AS ratings FROM edurec.ratings;
 SELECT COUNT(*) AS bili_comments FROM edurec.resource_comments;
 SELECT u.id, u.username, COUNT(r.id) AS rec FROM edurec.users u
   LEFT JOIN edurec.recommendations r ON r.user_id = u.id
-  WHERE u.username IN ('demo1','demo_admin','demo_fresh','BTXL','biliverify') GROUP BY u.id, u.username;
+  WHERE u.username IN ('demo_admin','demo_fresh','BTXL','biliverify') GROUP BY u.id, u.username;
 "@
 ```
 
-**本机当前实测值（2026-09-19 准备收尾时实查，会随演示增长）**：
+**本机当前实测值（2026-09-19 清除模拟数据后实查）**：
 
 | 指标 | 当前值 | 备注 |
 |---|---|---|
-| resources 总数 | **517** | 模拟资源占 id `0` 与 `154..499`；其余是 B 站采集行 |
-| 其中 `source_url like %bilibili.com%` | **170** | id `1..153` + 若干 `500+` 是最初导入基线（约 171）；准备阶段的实测抓取又增删了几条 |
-| 资源类型分布 | course 111 · article 111 · video 295 | video 多出来的是 B 站采集（会随演示增长） |
-| users | **2002** | `demo0..demo1999` + `demo_admin` + BTXL + biliverify + `demo_fresh` |
-| recommendations（缓存行） | **2001** | 有行 = engine 结果已导入过，首页走个性化（`demo_fresh` 那行已在 1.8 节按计划清掉） |
-| user_behaviors | **100017** | `demo_seed -with-behaviors` 播的 10 万条 |
-| ratings | **9840** | |
+| resources 总数 | **170** | **全部是真实 B 站采集资源**（模拟资源已清除） |
+| 其中 `source_url like %bilibili.com%` | **170** | 全部有来源链接；在线抓取会持续增加 |
+| 资源类型分布 | video 170 | 模拟的 course/article 已随模拟数据一并清除 |
+| users | **4** | `BTXL`(2) · `biliverify`(3) · `demo_admin`(2000) · `demo_fresh`(2001) |
+| recommendations（缓存行） | **3** | 属于 BTXL / biliverify / demo_admin；`demo_fresh` 无行 → 走兜底（1.8 节） |
+| user_behaviors | **37** | BTXL 23 条 + biliverify 14 条（**真实用户行为**，view/click/favorite 三类齐全） |
+| ratings | **3** | 真实评分 |
 | resource_comments（B 站评论缓存） | **30** | 打开 B 站视频详情页会自动追加 |
-| categories | 12 | 人工智能、B站视频、模拟类别0/3..11 |
-| `demo1` 的缓存行 | 1 条 | 就是首页个性化的来源 |
+| categories | 2 | 人工智能、B站视频（`模拟类别*` 已清除） |
 
 > ⚠️ **这些数字一定会「长大」，别当固定值报**：1.7 节或第 3 幕里执行 `python online.py ...`、在搜索页滚到底、
 > 打开 B 站视频详情页，都会**真实写库**（新增 B 站资源行 / 评论行）。这不是脏数据，是链路正常工作的证据。
@@ -153,29 +155,46 @@ SELECT u.id, u.username, COUNT(r.id) AS rec FROM edurec.users u
 > mysql -h 127.0.0.1 -P 3308 -u root -e "SELECT (SELECT COUNT(*) FROM edurec.resources) resources, (SELECT COUNT(*) FROM edurec.resources WHERE source_url LIKE '%bilibili.com%') bili, (SELECT COUNT(*) FROM edurec.users) users, (SELECT COUNT(*) FROM edurec.recommendations) recs, (SELECT COUNT(*) FROM edurec.resource_comments) comments;"
 > ```
 
-> ⚠️ **ID 重叠事实（重要，答辩会被问）**：`recommendations.json` 是 engine 模拟数据集产出的，
-> key 是模拟用户 id `0..1999`、value 是模拟资源 id `0..499`；而库里真实 B 站视频恰好占用 id `1..153`。
-> 所以导入时「数值 ID 相同」的模拟资源与真实 B 站视频会**混在同一个列表里**返回，
-> 这正是 `demo1` 首页会同时出现「模拟资源228」和《高等数学》的原因 —— 它不是 bug，是两套 ID 空间数值重叠的必然结果。
+> ⚠️ **补充：`avg_rating` 曾被回算修复**。清理时发现全库只有 1 条资源有 `avg_rating`，
+> 其余为 0 导致「按评分降序」的兜底退化成 id 倒序（首页被同主题资源刷屏）。
+> 已按 `ratings` 表回算：现 **153/170** 条资源有真实均分（如《泛函分析》3.2、《解析几何》3.1），
+> 兜底列表因此是像样的热门内容。若老师问「热门怎么算的」，照实说：`AVG(score)` 降序、无评分者为 0 排后。
 
-### 1.6 复现「干净冷启动」的补救命令（只在库被清过时执行）
+> ⚠️ **ID 重叠事实（仍然重要，答辩会被问）**：`backend/data/recommendations.json` 是 engine 的**模拟数据集**产物，
+> key 是模拟用户 id `0..1999`、value 是模拟资源 id `0..499`；而平台真实 B 站视频占用 id `1..153`（数值重叠）。
+> 导入服务只保留「库中真实存在的用户 / 资源 id」（`recommendation_import.go:99-111`），其余计入 `skipped_*`。
+> **当前库已清除模拟数据**，所以现在导入会**绝大部分被跳过** —— 见下面对 1.6 节的警示。
+
+### 1.6 ⚠️ 不要执行 demo_seed（会重新引入模拟资源）
 
 ```powershell
-cd E:\work\learn\edurec-platform\backend
-$env:CONFIG_PATH='configs/config.local.yaml'
-go run ./cmd/demo_seed -with-behaviors
+# ⛔ 不要运行：这一条会把模拟资源/用户/分类/行为重新写回库，
+#    首页与搜索页会再次出现「模拟资源228」这类占位标题。
+# cd E:\work\learn\edurec-platform\backend
+# $env:CONFIG_PATH='configs/config.local.yaml'
+# go run ./cmd/demo_seed -with-behaviors
 ```
 
-期望：`[demo_seed] 类目=12 资源=500 用户=2000 行为=100000 评分=9967 管理员=2000`
-以及 `演示账号: demo<id> / demo123456（如 demo1）；管理员: demo_admin / demo123456`。
+**背景**：按你的要求「页面里不要有模拟资源」，2026-09-19 已把模拟数据**彻底清除**：
 
-> ⚠️ 最后那个数字是**管理员的 users.id**（本机 2000，即刚建的 `demo_admin`），**不是**「新建了 1 个管理员」。
-> 别在老师面前把它念成个数 —— `ensureAdmin()` 返回的是 id（`cmd/demo_seed/main.go:182-202`）。
-> （本条为 2026-09-19 实测输出，子代理初稿写的是「管理员=1」，已更正。）
-（`demo_seed` 全部走 `INSERT IGNORE`，**可反复执行**，已存在的行不会重复插入，所以上面这行数字是**尝试写入的行数**，
-不是本次新增数 —— 库已经在基线状态时它照样打印 500/2000。）
+```powershell
+# 已执行（留档备查）：删模拟资源 → 连带其行为/评分 → 删模拟用户及关联 → 删模拟分类
+DELETE b FROM user_behaviors b      JOIN resources r ON r.id=b.resource_id WHERE r.title LIKE '模拟资源%';
+DELETE t FROM ratings t             JOIN resources r ON r.id=t.resource_id WHERE r.title LIKE '模拟资源%';
+DELETE FROM resources               WHERE title LIKE '模拟资源%';
+DELETE FROM recommendations         WHERE resource_ids='[]' OR JSON_LENGTH(resource_ids)=0;
+DELETE b FROM user_behaviors b      JOIN users u ON u.id=b.user_id WHERE u.username LIKE 'demo%' AND u.username NOT IN ('demo_admin','demo_fresh');
+DELETE t FROM ratings t             JOIN users u ON u.id=t.user_id    WHERE u.username LIKE 'demo%' AND u.username NOT IN ('demo_admin','demo_fresh');
+DELETE rc FROM recommendations rc   JOIN users u ON u.id=rc.user_id   WHERE u.username LIKE 'demo%' AND u.username NOT IN ('demo_admin','demo_fresh');
+DELETE FROM users                   WHERE username LIKE 'demo%' AND username NOT IN ('demo_admin','demo_fresh');
+DELETE FROM categories              WHERE name LIKE '模拟类别%';
+```
 
-导入 engine 推荐结果（让首页个性化生效，管理员令牌随用随取）：
+> 于是 `demo<数字>` 账号（`demo1`…`demo1999`）**已不存在**；`demo_seed` 的用途也随之变成「只在需要恢复模拟数据时才跑」。
+> **演示前若发现库被清空**，正确做法不是跑 `demo_seed`，而是重建两个演示账号（见 1.8 / 第 2 幕的 register 命令）。
+
+**关于导入 engine 推荐结果**：`data/recommendations.json` 引用的是模拟资源 id `0..499`。
+在**已清除模拟数据**的库上导入，结果是绝大部分被跳过（只有 id `1..153` 中真实存在的那几条会命中）：
 
 ```powershell
 $login = Invoke-RestMethod http://127.0.0.1:8080/api/v1/auth/login -Method Post `
@@ -185,9 +204,12 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/admin/recommendations/import -Met
   -Headers @{ Authorization = "Bearer $tok" } | ConvertTo-Json -Compress
 ```
 
-期望：`{"code":0,"message":"ok","data":{"imported_users":2001,"skipped_users":0,"imported_resources":40020,"skipped_resources":0}}`
-（**本机实测原样返回**：2001 个用户全部命中，20 条/人 × 2001 人 = 40020 条资源引用，`skipped_users=0`。
-只有在**没跑过 `demo_seed`**、库里没有模拟资源 id `0..499` 的库上，`skipped_resources` 才会是几千的大数 —— 见 6.5 的说明。）
+> ⚠️ 现在跑它会得到（**已按当前数据精确推算**）：
+> `imported_users=3, imported_resources=16, skipped_users=1998, skipped_resources=40004` —— 命中率极低。
+> 因为这份 engine 产物来自**模拟数据集**，而库里已清除模拟数据，只有 id `1..153` 里真实存在的那几条会命中。
+> 它还会**覆盖**当前那 3 行真实缓存（写入这 16 条）。**建议只在老师明确想看"导入接口"时才跑**，
+> 并照着解释：「导入按平台真实存在的 ID 过滤，所以 `skipped_*` 很大 —— 这正说明**过滤逻辑生效**，
+> 引擎的内部编号换到平台库不会直接错配。」想恢复当前基线，见第 6 节复位说明。
 
 ### 1.7 在线抓取通路预检（第 3 幕要用，30 秒）
 
@@ -206,8 +228,8 @@ python online.py search --keyword "雅思" --limit 3 --page 1
 
 ### 1.8 让第 2 幕的兜底演示成立（30 秒，**必做**）
 
-第 2 幕要演示「缓存缺失 → 兜底并回写」，所以演示前必须把 `demo_fresh` 的缓存行清掉
-（任何一次导入/登录都会给它写上缓存行）：
+第 2 幕要演示「缓存缺失 → 兜底并回写」，所以演示前必须确认 `demo_fresh` **没有**缓存行
+（只要有人用它打开过首页，就会写上缓存行）：
 
 ```powershell
 $env:MYSQL_PWD='123456'
@@ -218,20 +240,21 @@ mysql -h 127.0.0.1 -P 3308 -u root -N -e "SELECT COUNT(*) FROM edurec.recommenda
 期望：第二条输出 `0`。**清完就不要再拿 demo_fresh 登录首页**（一登录就写回缓存行了），
 留到第 2 幕现场第一次打开时才触发兜底。
 
-若 `demo_fresh` 不存在（库被清过），按第 2 幕的 `register` 命令重建，或把上面的 `2001` 换成它的真实 id。
+> 库里当前应有 **3 行**缓存（user_id 2 / 3 / 2000，属于 BTXL / biliverify / demo_admin），`demo_fresh`(2001) 为 0 行。
+> 若 `demo_fresh` 不存在（库被清过），按第 2 幕的 `register` 命令重建，id 会变，把上面的 `2001` 换成它的真实 id。
 
 ### 1.9 自检快照（30 秒内扫一眼）
 
 - [ ] Redis `PING` → `PONG`
 - [ ] `8080/api/v1/health` → `healthy`
 - [ ] `5173/api/v1/health` → `healthy`（代理通）
-- [ ] 浏览器无痕窗口打开 `http://localhost:5173/login`，用 `demo1 / demo123456` 能进首页
+- [ ] 浏览器无痕窗口打开 `http://localhost:5173/login`，用 `demo_admin / demo123456` 能进首页
 - [ ] `demo_fresh` 的缓存行已清空（1.8 节，查询返回 `0`）
 - [ ] 浏览器另开无痕窗口（或退出登录后）用 `demo_admin / demo123456` 能进 `http://localhost:5173/admin`
-- [ ] 如果 `demo_fresh` 不存在，按第 2 幕的注册命令补一个（换个别名即可）
+- [ ] 首页、列表页、搜索结果里**看不到任何「模拟资源」字样**（搜索「模拟」应返回 0 条）
 - [ ] 终端里 4 个窗口：Redis、后端、前端、备用命令窗口
 
-> 建议准备**两个浏览器 profile/无痕窗口**：一个普通用户 `demo1`，一个管理员 `demo_admin`，
+> 建议准备**两个浏览器 profile/无痕窗口**：一个用 `demo_fresh`（普通用户视角），一个用 `demo_admin`（管理员），
 > 避免每幕都要退出登录（退出登录会清 token，刷新 token 在 Redis 里）。
 
 ---
@@ -240,7 +263,7 @@ mysql -h 127.0.0.1 -P 3308 -u root -N -e "SELECT COUNT(*) FROM edurec.recommenda
 
 | 幕 | 页面 | 讲什么（决策编号） |
 |---|---|---|
-| 1 | `/`（demo1） | 首页个性化推荐 = 读缓存表（#1 #2 #3 #12 #24） |
+| 1 | `/`（demo_admin） | 首页推荐 = 读缓存表（#1 #2 #3 #12 #24） |
 | 2 | `/login`（demo_fresh）→ `/` | 个性化 vs 热门兜底的分界 + 兜底回写缓存（#12 #24） |
 | 3 | `/search` | 三条内容渠道 + 在线抓 B 站 + 无限滚动（#28 #29 #30 #31 #32） |
 | 4 | `/resources/:id` | 资源统一抽象 / B 站评论独立建模（#24 #29 #30） |
@@ -251,32 +274,37 @@ mysql -h 127.0.0.1 -P 3308 -u root -N -e "SELECT COUNT(*) FROM edurec.recommenda
 
 ---
 
-### 第 1 幕 · 首页个性化推荐（约 2 分钟）
+### 第 1 幕 · 首页：读推荐缓存表（约 2 分钟）
 
 **操作**
-1. 打开 `http://localhost:5173/login`，输入 `demo1` / `demo123456`，回车登录。
+1. 打开 `http://localhost:5173/login`，输入 `demo_admin` / `demo123456`，回车登录。
+   （用 `BTXL` / `biliverify` 效果相同，但它们没有已知密码；`demo_admin` 同时还能进后台，一举两得。）
 2. 登录后自动跳到 `http://localhost:5173/`（首页）。
 
 **说什么（一句话要点）**
-> 「首页这个列表不是后端算出来的，是**读 `recommendations` 缓存表**返回的；缓存的每一行都是 engine 离线推理的产物，platform 只做查询和排序还原。这就是决策 #12『离线批量 + 结果落库』。」
+> 「首页这个列表不是后端现算的，是**读 `recommendations` 缓存表**返回的；缓存里存的是资源 ID 的有序列表，
+> platform 只做查询与顺序还原。这就是决策 #12『离线批量 + 结果落库』——**个性化与否，取决于这张表有没有这一行**。」
+> 再补一句现状（诚实）：「当前库里是 3 行真实缓存（BTXL / biliverify / demo_admin），共 170 条真实 B 站资源，
+> **页面上已经没有任何模拟数据**。」
 
 **期望看到**
-- 页面标题「发现优质教育资源」，副标题「为你推荐的精选课程、文章与视频」，下面是 3 列卡片网格，**12 张卡片**（首页固定请求 `limit=12`）。
-- 卡片里会**混着** `模拟资源228`、`模拟资源340` 这类模拟资源，和《高等数学》全程教学视频、《机器人学》这类真实 B 站视频 —— 这就是第 1.5 节讲的 ID 数值重叠。
+- 页面标题「发现优质教育资源」，副标题「为你推荐的精选课程、文章与视频」，**12 张真实卡片**（首页固定请求 `limit=12`）。
+- 卡片全是真实 B 站教育视频（如《高等数学》宋浩、《泛函分析》、《解析几何》），**没有「模拟资源」字样**。
 - 打开 DevTools Network，能看到 `GET /api/v1/recommendations?limit=12` 返回 `code:0`，且 `data.updated_at` 有值（Excel 序列号那种格式不用管，是 `time.Unix(...)` 转出来的）。
 
 **证据链（可选，在备用终端敲）**
 
 ```powershell
 $login = Invoke-RestMethod http://127.0.0.1:8080/api/v1/auth/login -Method Post `
-  -ContentType 'application/json' -Body '{"username":"demo1","password":"demo123456"}'
+  -ContentType 'application/json' -Body '{"username":"demo_admin","password":"demo123456"}'
 $tok = $login.data.access_token
-$rec = Invoke-RestMethod 'http://127.0.0.1:8080/api/v1/recommendations?limit=3' -Headers @{ Authorization = "Bearer $tok" }
-$rec.data.list | Select-Object id, title
+$rec = Invoke-RestMethod 'http://127.0.0.1:8080/api/v1/recommendations?limit=12' -Headers @{ Authorization = "Bearer $tok" }
+$rec.data.list | Select-Object id, title     # 应返回 12 条真实资源
 ```
 
 **对应决策**：#1（集成方式）、#2（文件/目录交接）、#3（engine 独立仓库）、#12（离线批量 + 结果落库）、#24（资源统一抽象 + JSON metadata）。
 **代码位置**：`frontend/src/pages/home/index.vue` → `backend/internal/service/recommendation.go` 的 `Get()`（命中缓存分支）。
+**兜底**：若缓存行为 0（库被清过），首页会自动走热门兜底 —— 直接接第 2 幕讲，不影响演示。
 
 ---
 
@@ -284,10 +312,10 @@ $rec.data.list | Select-Object id, title
 
 这一幕**不点 UI**，讲的是第 1 幕背后的分支，是最容易被追问的点。
 
-**操作（推荐：用预置的"新注册用户" `demo_fresh`）**
+**操作（用没有缓存行的用户 `demo_fresh`）**
 
 `demo_fresh` **在本机已经建好了**（用户名 `demo_fresh` / 密码 `demo123456`，users.id=2001），
-演示前按 **1.8 节**把它的推荐缓存行删掉即可；下面这条只在「库被清过、账号没了」时才需要跑：
+演示前按 **1.8 节**确认它的推荐缓存行为 0 即可；下面这条只在「库被清过、账号没了」时才需要跑：
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8080/api/v1/auth/register -Method Post `
@@ -295,9 +323,9 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/auth/register -Method Post `
   -Body '{"username":"demo_fresh","email":"demo_fresh@sim.local","password":"demo123456","display_name":"新注册演示用户"}'
 ```
 
-> ⚠️ **坑（现场极易翻车）**：`demo<id>` 里的数字**不等于 users.id** ——
-> `demo0`=id 0、`demo1`=id 1，但 `id 2` 是 `BTXL`、`id 3` 是 `biliverify`（且它们的密码**不是** `demo123456`），
-> `demo4`=id 4 往后才对齐。所以**不要**用 `id` 反推账号名，也别拿 `BTXL`/`biliverify` 当演示账号。
+> ⚠️ **账号说明**：库里现在只有 4 个真实用户 —— `BTXL`(id 2) · `biliverify`(id 3) · `demo_admin`(id 2000) · `demo_fresh`(id 2001)。
+> `BTXL` / `biliverify` 是真实注册用户、**密码不是 `demo123456`**，不要拿来演示登录。
+> （原 `demo0..demo1999` 属模拟数据，已随模拟资源一并清除，**不再存在**。）
 
 现场操作：
 1. 退出当前登录，用 `demo_fresh` / `demo123456` 登录，落到首页。
@@ -308,11 +336,12 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/auth/register -Method Post `
 > 「缓存表里**没有这一行**的用户（新注册、engine 还没覆盖到）不会没有推荐：后端按 `avg_rating DESC, id DESC` 取一批资源返回，并顺手写一行缓存。所以『引擎还没跑/没覆盖到我』的降级表现是**一个非空的通用列表**，不是空白页 —— 决策 #12 明确要求服务始终有返回。」
 
 **期望看到**
-- `demo_fresh` 首页有 **12 张卡片**（`demo_fresh` 是 2026-09-19 新注册的，第一次请求必然走兜底）。
-- 列表内容是 **id 最大的那批资源**（如 id 517/516/515… 的《线性代数》系列视频）。
-- 再说一句**容易被追问的细节**：兜底排序键是 `avg_rating DESC, id DESC`，而库里真实 B 站视频的 `avg_rating` 全是 `0`
-  （B 站接口没有评分，导入时固定写 0，见 `bilibili-import.md` 字段映射），所以"评分降序"实际退化成"**新上架优先**" ——
-  这正好是兜底应有的语义：**给新用户/新资源一个曝光位**。
+- `demo_fresh` 首页有 **12 张卡片**（它没有缓存行，第一次请求必然走兜底）。
+- 列表内容是**真实评分最高的那批 B 站资源**：实测为《泛函分析 8-1：完备化》(id 103, 3.2)、《解析几何的本质是什么？》(id 139, 3.1)、
+  《复变函数与积分变换》正课 (id 119, 3.0) 等 —— **全是真实内容，无模拟资源**。
+- 再说一句**容易被追问的细节**：兜底排序键是 `avg_rating DESC, id DESC`。清理阶段已按 `ratings` 表回算过 `avg_rating`
+  （现 **153/170** 条有真实均分，其余为 0 排在后），所以这个列表是像样的热门内容，而不是退化成 id 倒序。
+  早期版本里"评分降序会退化成新上架优先"的说法**在当前数据上已不成立**，别照旧讲。
 - 再到 1.5 节的 SQL 里查一次 `recommendations`，`demo_fresh` 的缓存行**从 0 变成 1**（用 `WHERE user_id=2001`）—— 兜底确实写回了缓存。
   顺手说清**这正是「陈旧但可用」语义的由来**：下一次导入（第 6.5 / 第 7 幕）会用 engine 的新结果**覆盖**这一行，在那之前首页一直读的是它。
 
@@ -446,9 +475,13 @@ mysql -h 127.0.0.1 -P 3308 -u root -N -e "SELECT COUNT(*) FROM edurec.resource_c
 
   ```powershell
   $env:MYSQL_PWD='123456'
+  # 注意：users 表里已没有 id=1 这个用户（真实用户只有 id 2/3/2000/2001），
+  # 所以下面用「取当前演示用户的 id」而不是写死 1 —— 拿 id 查空表就白演了。
   mysql -h 127.0.0.1 -P 3308 -u root -e @"
-  SELECT action, resource_id, created_at FROM edurec.user_behaviors WHERE user_id=1 ORDER BY id DESC LIMIT 5;
-  SELECT resource_id, score, comment FROM edurec.ratings WHERE user_id=1 ORDER BY id DESC LIMIT 3;
+  SELECT action, resource_id, created_at FROM edurec.user_behaviors
+    WHERE user_id=(SELECT id FROM edurec.users WHERE username='demo_fresh') ORDER BY id DESC LIMIT 5;
+  SELECT resource_id, score, comment FROM edurec.ratings
+    WHERE user_id=(SELECT id FROM edurec.users WHERE username='demo_fresh') ORDER BY id DESC LIMIT 3;
   "@
   ```
 
@@ -471,7 +504,7 @@ http://localhost:5173/admin
 侧边栏四项：仪表盘 / 资源管理 / 用户管理 / 分类管理。
 
 **6.1 仪表盘 `/admin`（30 秒）**
-- 期望：两张可点的大数字卡 ——「资源总数 **517**」「用户总数 **2002**」（准备收尾时的实测值；**以 1.5 节上台前实查的为准**，在线抓取会让它只增不减），下面三个快捷入口。
+- 期望：两张可点的大数字卡 ——「资源总数 **170**」「用户总数 **4**」（清除模拟数据后的实测值；**以 1.5 节上台前实查的为准**，在线抓取会让资源数只增不减），下面三个快捷入口。
 - 说什么：「管理员身份不是用户表里的一个 flag，而是**独立的 `admins` 表**（`id, user_id`）——决策 #25。所以 `demo_admin` 是『users 里一行 + admins 里一行』。」
 
 **6.2 用户管理 `/admin/users`（1 分钟）**
@@ -487,7 +520,7 @@ http://localhost:5173/admin
 
 **6.4 分类管理 `/admin/categories`（1 分钟）**
 - 操作：输入分类名「**答辩演示分类**」，描述随便写，点创建。
-- 期望：分类列表里立刻出现新行（当前库里 12 个分类：人工智能、B站视频、模拟类别0/3..11）。
+- 期望：分类列表里立刻出现新行（当前库里 **2 个**分类：人工智能、B站视频）。
 - 说什么：「分类是 find-or-create 语义 —— 采集/导入时遇到没见过的分类名会**静默新建**（决策 #28/#29 的已知限制），所以后台这里能直接管。」
 - ⚠️ 如果不想污染数据，这一步可以**只讲不点**（把输入框填好，说「这里点下去就建了」）。
 
@@ -504,14 +537,19 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/admin/recommendations/import -Met
   -Headers @{ Authorization = "Bearer $tok" } | ConvertTo-Json -Compress
 ```
 
-- 期望：`{"code":0,"message":"ok","data":{"imported_users":2001,"skipped_users":0,"imported_resources":40020,"skipped_resources":0}}`
-  —— 这是本机实测的原样返回（2001 用户 × 20 条 = 40020 个资源引用）。**别把它当固定值**：
-  `imported_resources` 取决于 `recommendations.json` 每人的条数，`skipped_resources` 只在库里缺少对应资源 id 时才非 0。
+- 期望（**清除模拟数据后的当前值，按现有数据精确推算**）：
+  `{"code":0,"message":"ok","data":{"imported_users":3,"skipped_users":1998,"imported_resources":16,"skipped_resources":40004}}`
+  —— 只有 3 个真实用户命中，其余 1998 个 key 是已删除的模拟用户 id；`skipped_resources` 巨大是因为文件引用的是模拟资源 id。
+  **别把它当失败**：接口返回 `code:0`，过滤行为完全正确。
 - 说什么：「这个接口**只认一个文件**：`engine.recommendations_file`（`data/recommendations.json`，配置见 `configs/config.local.yaml` 的 `engine:` 段）。
   格式是 `{"<user_id>": [<resource_id>, ...]}`，**平台原始 ID**；导入时按库里真实存在的 user/resource 过滤，
   其余跳过 —— 返回里的 `skipped_*` 就是被过滤掉的数量（决策 #12、#15 的 Viper 配置外置）。」
-- 顺手补一句已知坑：「`recommendations.json` 的模拟资源 id 是 0..499，库里真实 B 站资源只占 1..153（现在加上现场抓的共 170 条），
-  所以**必须先跑 `demo_seed` 播入模拟资源**，否则导入会大比例跳过、首页几乎没有个性化命中。」
+- 顺手补两句现状（**重要，别说反**）：
+  1. 「`recommendations.json` 是 engine **模拟数据集**的产物（引用资源 id `0..499`），而库里现在只有 170 条**真实** B 站资源，
+     所以命中率天然很低 —— 这正是『两套 ID 空间靠数值相同才匹配』的体现。」
+  2. ⛔ **不要为了"让导入好看"去跑 `demo_seed`** —— 那会把模拟资源重新写回库、首页又出现「模拟资源228」，
+     违背今天"页面里不要有模拟资源"的要求（见 1.6 节）。导入这一步**只讲过滤语义**即可。
+  3. 跑完它会把那 3 行真实缓存**覆盖**成这 16 条；想恢复基线看第 6 节。
 
 **对应决策**：#4（Handler→Service→Repository）、#25（独立 admins 表）、#18（后台布局）、#28/#29（采集资源在后台可管）、#12/#15（导入接口与配置外置）、#20（统一错误处理与中间件）。
 
@@ -544,32 +582,32 @@ Get-Content "data\snapshots\$run\meta.json"
 ```
 
 期望文件：`meta.json` + `users.csv` + `resources.csv` + `categories.csv` + `behaviors.csv` + `ratings.csv`。
-`meta.json` 实机内容如下（数值随导出时刻变化，字段结构固定）：
+`meta.json` 实机内容如下（**2026-09-19 12:16:13 清除模拟数据后的真实导出**，数值随导出时刻变化，字段结构固定）：
 
 ```json
 {
   "behavior_window": { "end": 1789556016, "start": 0 },
-  "behaviors_count": 100017,
-  "categories_count": 12,
+  "behaviors_count": 37,
+  "categories_count": 2,
   "contract_version": 1,
-  "exported_at": 1789790338,
+  "exported_at": 1789791373,
   "files_sha256": {
-    "behaviors.csv": "5b255811...",
-    "categories.csv": "498f3815...",
-    "ratings.csv": "ea7fd53d...",
-    "resources.csv": "61f5ba15...",
-    "users.csv": "d74a3ffb..."
+    "behaviors.csv": "8a0e0c4d...",
+    "categories.csv": "f0efe8a6...",
+    "ratings.csv": "25d90957...",
+    "resources.csv": "26e26ea2...",
+    "users.csv": "2c222f86..."
   },
-  "ratings_count": 9840,
-  "resources_count": 518,
-  "run_id": "20260919_115858",
-  "users_count": 2002
+  "ratings_count": 3,
+  "resources_count": 170,
+  "run_id": "20260919_121613",
+  "users_count": 4
 }
 ```
 
-> ⚠️ 上面这段是**当时（11:58:58）那次导出的真实输出**，`resources_count` 就是 518。
-> 你现场重新 `export_snapshot` 时会得到一个**新的** `run_id` 和更大的 `resources_count`（后面在线抓的都算进去了），
-> 这是正常的 —— **照终端实际输出念，别念这份示例**。
+> ⚠️ **照终端实际输出念，别念这份示例**：你现场重新 `export_snapshot` 会得到**新的 `run_id`**，
+> 而且 `resources_count` 会随着第 3 幕的在线抓取变大（演示过搜索就会多几十条）。
+> 讲的重点是**结构**：`contract_version` + `files_sha256`（可校验）+ 各表 count，而不是具体数字。
 
 指给老师看四个点：**`contract_version`**（契约版本，换字段要升版本）、**`run_id`**（与目录名一致，一轮一 id）、
 **`behavior_window`**（行为时间窗，engine 据此切训练集）、**`files_sha256`**（每个文件的校验和，engine 可验完整性）。
@@ -610,7 +648,7 @@ bash scripts/handoff.sh --infer-only # 复用 model/models.pt，只导出 + 推�
 `ENGINE_ROOT` / `CONFIG_PATH` / `SNAPSHOT_DIR` / `BASE_URL` / `ADMIN_USER` / `ADMIN_PASS` 都可环境变量覆盖。
 
 **期望看到的现象**
-- 快照目录下 6 个文件齐全，`meta.json` 的 `behaviors_count` ≈ 100017（含第 5 幕现场产生的那几条）。
+- 快照目录下 6 个文件齐全，`meta.json` 的 `behaviors_count` ≈ 37（含第 5 幕现场产生的那几条）。
 - 导入返回的 `imported_users` 与库里用户数同量级。
 - 首页 `updated_at` 刷新。
 
@@ -716,7 +754,7 @@ npm test ; npm run type-check
 - **处理**：
   1. 确认关键词框里是 `雅思`（本地 `total` 为 0，最干净），且**分类/类型/标签三个筛选都是空的**；
   2. 把浏览器窗口缩小到一屏放不下，再滚到底；
-  3. 兜底：直接在地址栏请求在线接口，让老师看后端实时抓取（用 demo1 的 token）：
+  3. 兜底：直接在地址栏请求在线接口，让老师看后端实时抓取（用 demo_admin 的 token）：
      ```powershell
      (Invoke-RestMethod 'http://127.0.0.1:8080/api/v1/resources?keyword=雅思&online_page=1' `
        -Headers @{ Authorization = "Bearer $tok" }).data | ConvertTo-Json -Depth 4 -Compress
@@ -751,16 +789,22 @@ npm test ; npm run type-check
 - **`Internal` / 文件读取失败**：`backend/data/recommendations.json` 不存在或不是合法 JSON。
   → 用 1.6 节的命令重建缓存；或先讲「整份文件为空/导入失败 → **缓存不变**，服务继续返回旧结果或兜底（陈旧但可用）」（`docs/engine-integration.md` 的「服务语义：空 / 缺失 / 陈旧」）。
 - **`imported_resources` 很小、`skipped_resources` 很大**：
-  → 说明这个库缺少 `recommendations.json` 里引用的资源 id，最常见的原因就是**没跑过 `demo_seed`**（模拟资源 `0..499` 不在库里）。
-  讲解要点正是 1.5 节的 ⚠️「两套 ID 空间数值重叠」；同时展示 `recommendations` 缓存表**已经有 2001 行**、首页照常有个性化，说明「过滤后仍然命中」。
+  → **这是清除模拟数据后的正常结果，不是故障**。`recommendations.json` 是 engine **模拟数据集**的产物（资源 id `0..499`），
+  而 2026-09-19 已把模拟资源清出库，库里只剩 170 条真实 B 站视频（`id 1..153` 是基线），两套 id 只有数值相同才匹配得上。
+  讲解要点正是 1.5 节的 ⚠️「两套 ID 空间数值重叠」：导入只写「库里真实存在的 id」，
+  所以**导入后 `recommendations` 缓存表仍只有那 3 行**（user_id 2 / 3 / 2000，属于 BTXL / biliverify / demo_admin），
+  但被**覆盖**成过滤后的少量结果，首页照常返回非空列表 —— 说明「过滤后仍然命中」。⛔ 别为了让它"好看"去跑 `demo_seed`（见 1.6 节）。
 - **401 / 403**：token 过期（Access 15 分钟）。重新执行登录那两行拿新 token 即可；或讲决策 **#20**（HTTP 状态码 + 业务错误码 + middleware 统一封装）。
 
 ### 兜底 H · 前端编译/热更报错，页面白屏
 
 - **处理**：`cd frontend && pnpm install && pnpm run dev` 重启；
   确认 `.env.development.local` 里是 `VITE_MOCK=0`（若被改回 1，前端会走 MSW 假数据 —— 那时**所有页面都"能用"但数据是假的**，答辩时会被看穿）。
-- **快速辨别真假**：真后端的数据里有「模拟资源228」和真实 B 站视频标题混排；MSW 假数据里没有这些。
-- **终极兜底**：直接播放/展示 `docs/design.md` 的架构图与决策记录表，按第 1、2 幕的话术讲架构与推荐口径。
+- **快速辨别真假**（旧版「看有没有模拟资源」的判据已失效，模拟数据清除后不再适用）：
+  1. 直接请求代理：`Invoke-RestMethod http://127.0.0.1:5173/api/v1/health` —— 真后端返回 `{"code":0,...,"status":"healthy"}`，MSW 拦不到这个路径；
+  2. 用 `node -e "console.log(require('vite').loadEnv('development',process.cwd(),'VITE_').VITE_MOCK)"` 确认输出是 `"0"`（1.3 节）；
+  3. 真后端首页是 12 条真实 B 站视频（带封面、作者、浏览量）；MSW 假数据是它自己造的固定条目。
+- **终极兜底**：直接展示 `docs/design.md` 的架构图与决策记录表，按第 1、2 幕的话术讲架构与推荐口径。
 
 ---
 
@@ -787,25 +831,36 @@ npm test ; npm run type-check
 ## 6. 演示后复位（让下一次演示仍是同一套数据）
 
 ```powershell
-# 1) 删掉本场新建的演示分类（如果第 6.4 幕真点了创建）
 $env:MYSQL_PWD='123456'
+
+# 1) 删掉本场新建的演示分类（如果第 6.4 幕真点了创建）
 mysql -h 127.0.0.1 -P 3308 -u root -e "DELETE FROM edurec.categories WHERE name='答辩演示分类';"
 
-# 2) 第 3 幕现场抓进来的 B 站资源留着也行（幂等，不影响下次演示）；
-#    若想回到「只有最初基线」的 B 站资源集合，删掉本轮新增的（注意：这些行的 id 会 > 499）：
-# mysql -h 127.0.0.1 -P 3308 -u root -e "DELETE FROM edurec.resources WHERE source_url LIKE '%bilibili.com%' AND id > 499;"
-#    同样可清掉本轮抓的评论（评论行没有 id 区间，按 bvid 或时间清）：
-# mysql -h 127.0.0.1 -P 3308 -u root -e "DELETE FROM edurec.resource_comments WHERE created_at > NOW() - INTERVAL 1 DAY;"
+# 2) 让第 2 幕的「兜底」在下一场依然成立（最常需要做的一步）
+#    只要有人用 demo_fresh 打开过首页，它就有缓存行了 → 下次不再走兜底。
+mysql -h 127.0.0.1 -P 3308 -u root -e "DELETE FROM edurec.recommendations WHERE user_id = 2001;"
+mysql -h 127.0.0.1 -P 3308 -u root -N -e "SELECT COUNT(*) FROM edurec.recommendations WHERE user_id = 2001;"
+#    期望输出 0。等价做法：现场现场注册一个新账号（见第 2 幕 register 命令）。
 
-# 3) 重新导入一次推荐结果，保证首页缓存是最新一轮（可选）
-#    见第 6.5 节命令（幂等，覆盖写缓存行）
+# 3) 第 3 幕现场抓进来的 B 站资源：默认【留着】。
+#    它们是真实内容，不影响下次演示，反而让库更丰富（唯一影响是某些关键词的本地命中数变大，
+#    所以走查建议"连续演示就换一个没演过的关键词"，见第 3 幕）。
+#    若确实想清掉本场新增的，按导入时间倒序删（没有 id 区间可依赖了）：
+# mysql -h 127.0.0.1 -P 3308 -u root -e "DELETE FROM edurec.resources WHERE created_at > '2026-09-19 12:20:00';"
+#    注意：会因外键失败（行为/评分引用），需要先删引用行；不确定就别删。
 
-# 4) 让第 2 幕的兜底演示在下一场依然成立：
-#    导入时 demo_fresh（id=2001）也被 engine 结果覆盖了，它就不再"没有缓存行"了。
-#    最省事的做法是删掉它的缓存行：
-# mysql -h 127.0.0.1 -P 3308 -u root -e "DELETE FROM edurec.recommendations WHERE user_id = 2001;"
-#    （等价做法：现场注册一个新的 fresh 账号，见第 2 幕的 register 命令）
+# 4) 若第 6.5 幕真跑了「导入 engine 推荐结果」，那 3 行缓存会被覆盖成 16 条。
+#    恢复方式二选一：
+#    a) 不必恢复 —— 首页照样有内容，只是个性化排序变弱；
+#    b) 重新灌入"评分最高"的列表（等价于兜底结果），或直接清掉让兜底重建：
+# mysql -h 127.0.0.1 -P 3308 -u root -e "DELETE FROM edurec.recommendations;"
+#    （清空后每个用户首次访问都会走兜底并回写，首页始终非空）
+
+# 5) ⛔ 不要用 demo_seed 来"恢复演示数据" —— 那会重新引入模拟资源（见 1.6 节）。
 ```
+
+> 一句话记法：**要复位的只有一条 —— `demo_fresh` 的缓存行**（第 2 步）。
+> 其余都无害；而**唯一会造成"页面出现模拟资源"的操作是 `demo_seed`，别跑它**。
 
 ---
 

@@ -132,6 +132,8 @@
 【阶段 0】内容入池（三条渠道，一次性/周期性，与推荐链路解耦）
   ① 手工录入 / 管理后台   POST /api/v1/resources (管理员)      handler/resource.go
   ② demo_seed 模拟数据    cmd/demo_seed  ← engine dataset/sim 文件
+     ⚠️ 当前库未启用此轨道（2026-09-19 按要求清除全部模拟数据）；
+        代码与文档保留，需要回归演示时可复现，但**别当现状讲**
   ③ B 站离线采集          crawler/run.py → data/bilibili/latest.json
                           → cmd/import_bilibili
   ④ B 站在线搜索/评论     handler/resource.go + service/bilibili_online.go
