@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
-# start.sh — 本地开发/演示一键启动
+# start.sh — 本地开发/演示一键启动（只起服务，不准备数据）
 #
-# 依次完成：起 MySQL/Redis 容器 → 等 MySQL 就绪 → 准备模拟数据 →
-# 幂等播种 → 后台启动后端 → 后台启动前端 → 打印访问信息。
+# 依次完成：起 MySQL/Redis 容器 → 等 MySQL 就绪 → 后台启动后端 →
+# 后台启动前端 → 打印访问信息。
 #
-# 与 scripts/handoff.sh 互补：本脚本负责"把服务跑起来"，
-# 个性化推荐刷新仍用 handoff.sh（训练/推理/导入是重操作，不放进启动脚本）。
+# 数据准备（二选一，启动前/后执行均可）：
+#   bash scripts/seed.sh        # 播种 sim 演示数据
+#   bash scripts/bilibili.sh    # 采集 B 站真实数据
+# 个性化推荐刷新：bash scripts/handoff.sh
 #
 # 用法：
 #   bash scripts/start.sh           # 一键启动
-#   bash scripts/stop.sh         # 停止服务
-#   bash scripts/stop.sh --with-db   # 连容器一起停
+#   bash scripts/stop.sh            # 停止服务
+#   bash scripts/stop.sh --with-db  # 连容器一起停
 #
 # 可用环境变量覆盖：
-#   ENGINE_ROOT    engine 仓库根目录（默认 ../edurec-engine）
 #   CONFIG_PATH    后端配置（默认 configs/config.yaml，相对 backend/）
 #   MYSQL_PASSWORD MySQL root 密码（默认 root，与 config.yaml 对齐）
 #   MYSQL_DATABASE 数据库名（默认 edurec）
@@ -27,7 +28,6 @@ BACKEND_DIR="$PLATFORM_ROOT/backend"
 FRONTEND_DIR="$PLATFORM_ROOT/frontend"
 RUN_DIR="$SCRIPT_DIR/.run"
 
-ENGINE_ROOT="${ENGINE_ROOT:-$PLATFORM_ROOT/../edurec-engine}"
 CONFIG_PATH="${CONFIG_PATH:-configs/config.yaml}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-root}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-edurec}"
@@ -75,24 +75,8 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-# ---- ③ 模拟数据 + 幂等播种 ---------------------------------------------------
-log "③ 准备模拟数据并幂等播种"
-[ -d "$ENGINE_ROOT" ] || die "engine 目录不存在: $ENGINE_ROOT"
-if [ ! -d "$BACKEND_DIR/data/sim" ]; then
-  [ -d "$ENGINE_ROOT/dataset/sim" ] || die "engine 无模拟数据: $ENGINE_ROOT/dataset/sim（先跑 gen_sim_data）"
-  cp -r "$ENGINE_ROOT/dataset/sim" "$BACKEND_DIR/data/sim"
-  echo "已从 engine 拷贝模拟数据 -> backend/data/sim"
-fi
-USER_COUNT="$(docker exec edurec-mysql mysql -uroot -p"$MYSQL_PASSWORD" -N -e \
-  "SELECT COUNT(*) FROM $MYSQL_DATABASE.users" 2>/dev/null || echo 0)"
-if [ "$USER_COUNT" = "0" ] || [ -z "$USER_COUNT" ]; then
-  ( cd "$BACKEND_DIR" && CONFIG_PATH="$CONFIG_PATH" go run ./cmd/demo_seed -with-behaviors )
-else
-  echo "已有 ${USER_COUNT} 个用户，跳过播种"
-fi
-
-# ---- ④ 后端 ------------------------------------------------------------------
-log "④ 启动后端 (:${BACKEND_PORT})"
+# ---- ③ 后端 ------------------------------------------------------------------
+log "③ 启动后端 (:${BACKEND_PORT})"
 mkdir -p "$RUN_DIR"
 if port_listening "$BACKEND_PORT"; then
   echo "端口 ${BACKEND_PORT} 已在监听，跳过"
@@ -103,8 +87,8 @@ else
   echo "已后台启动，日志 scripts/.run/backend.log"
 fi
 
-# ---- ⑤ 前端 ------------------------------------------------------------------
-log "⑤ 启动前端 (:${FRONTEND_PORT})"
+# ---- ④ 前端 ------------------------------------------------------------------
+log "④ 启动前端 (:${FRONTEND_PORT})"
 if port_listening "$FRONTEND_PORT"; then
   echo "端口 ${FRONTEND_PORT} 已在监听，跳过"
 else
@@ -114,8 +98,8 @@ else
   echo "已后台启动，日志 scripts/.run/frontend.log"
 fi
 
-# ---- ⑥ 总结 ------------------------------------------------------------------
-log "⑥ 完成"
+# ---- ⑤ 总结 ------------------------------------------------------------------
+log "⑤ 完成"
 MOCK_NOTE=""
 if grep -q "VITE_MOCK=1" "$FRONTEND_DIR/.env.development" 2>/dev/null; then
   MOCK_NOTE="  ⚠ 前端当前是 mock 模式（VITE_MOCK=1），连真实后端请改 VITE_MOCK=0 并重启前端"
@@ -126,8 +110,10 @@ cat <<EOF
   前端   http://localhost:${FRONTEND_PORT}   日志 $RUN_DIR/frontend.log
   数据库 MySQL root/${MYSQL_PASSWORD} @ localhost:3306 / ${MYSQL_DATABASE}
 
-  演示账号：demo1 / demo123456（普通用户）；demo_admin / demo123456（管理员）
+  数据准备（按需二选一）：
+    bash scripts/seed.sh        # 播种 sim 演示数据
+    bash scripts/bilibili.sh    # 采集 B 站真实数据
+  个性化推荐刷新：bash scripts/handoff.sh
 ${MOCK_NOTE}
-  个性化推荐刷新：source $ENGINE_ROOT/.venv/bin/activate && bash scripts/handoff.sh
   停止服务：bash scripts/stop.sh
 EOF

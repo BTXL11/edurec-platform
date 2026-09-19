@@ -15,19 +15,20 @@
 前置（仅首次）：Docker 可用；engine 依赖已装（`cd ../edurec-engine && pip install -e .[dev]`）。
 
 ```bash
-# ① 一键启动（起容器 → 播种 → 后端 :8080 → 前端 :5173）
+# ① 起服务（容器 → 后端 :8080 → 前端 :5173）
 bash scripts/start.sh
 
-# ② 刷新个性化推荐（导出快照 → engine 训练/推理 → 导入缓存表）
+# ② 准备数据（二选一）
+bash scripts/seed.sh        # 演示数据：播种 sim（登录账号 demo1/demo123456）
+bash scripts/bilibili.sh    # 真实数据：采集 B 站视频入库
+
+# ③ 刷新个性化推荐（导出"当前库里的数据" → engine 训练/推理 → 导入缓存表）
 bash scripts/handoff.sh
 
-# ③ 收工
+# ④ 收工
 bash scripts/stop.sh            # 只停后端/前端
 bash scripts/stop.sh --with-db  # 连数据库容器一起停
 ```
-
-浏览器打开 http://localhost:5173，登录 `demo1` / `demo123456`（管理员 `demo_admin` / `demo123456`）。
-三个脚本均幂等，可重复执行。
 
 ### 手动运行
 
@@ -53,8 +54,10 @@ cd ../frontend && pnpm install && pnpm dev
 
 | 脚本 | 作用 |
 |---|---|
-| `scripts/start.sh` | 一键启动：容器 → 播种 → 后端 → 前端（幂等） |
+| `scripts/start.sh` | 一键启动：容器 → 后端 → 前端（不准备数据） |
 | `scripts/stop.sh [--with-db]` | 停止服务；`--with-db` 连容器一起停 |
+| `scripts/seed.sh` | 播种 sim 演示数据（拷贝 + demo_seed，幂等） |
+| `scripts/bilibili.sh` | B 站采集+导入（`--dry-run`/`--crawl-only`/`--import-only`） |
 | `scripts/handoff.sh [--infer-only]` | 推荐刷新：导出 → 训练 → 推理 → 导入；`--infer-only` 跳过训练 |
 
 ## 推荐闭环（engine 离线批量训练 → 结果落库）
@@ -84,6 +87,8 @@ engine 与平台目录隔离，交接物为数据快照与推荐结果文件，�
 
 除手工录入 / `demo_seed` 外，平台还有一条独立的内容渠道：Python 采集 B 站公开视频元数据 → 输出 JSON → Go 命令导入
 `resources` 表。视频以 `type=video` 的普通资源**混入现有资源列表**，不新增专区、不改动推荐链路。
+
+一键方式：`bash scripts/bilibili.sh`（自动建 crawler venv + 采集 + 导入，等价于下面手动两步）。
 
 ```bash
 # ① 采集（需 pip install -r backend/crawler/requirements.txt）
