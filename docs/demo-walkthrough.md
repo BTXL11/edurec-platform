@@ -136,14 +136,14 @@ SELECT u.id, u.username, COUNT(r.id) AS rec FROM edurec.users u
 
 | 指标 | 当前值 | 备注 |
 |---|---|---|
-| resources 总数 | **170** | **全部是真实 B 站采集资源**（模拟资源已清除） |
-| 其中 `source_url like %bilibili.com%` | **170** | 全部有来源链接；在线抓取会持续增加 |
-| 资源类型分布 | video 170 | 模拟的 course/article 已随模拟数据一并清除 |
+| resources 总数 | **199** | **全部是真实 B 站采集资源**（模拟资源已清除）；在线抓取会持续增加 |
+| 其中 `source_url like %bilibili.com%` | **199** | 全部有来源链接 |
+| 资源类型分布 | video 199 | 模拟的 course/article 已随模拟数据一并清除 |
 | users | **4** | `BTXL`(2) · `biliverify`(3) · `demo_admin`(2000) · `demo_fresh`(2001) |
 | recommendations（缓存行） | **3** | 属于 BTXL / biliverify / demo_admin；`demo_fresh` 无行 → 走兜底（1.8 节） |
-| user_behaviors | **37** | BTXL 23 条 + biliverify 14 条（**真实用户行为**，view/click/favorite 三类齐全） |
-| ratings | **3** | 真实评分 |
-| resource_comments（B 站评论缓存） | **30** | 打开 B 站视频详情页会自动追加 |
+| user_behaviors | **42** | BTXL / biliverify 的真实行为（view/click/favorite 三类齐全） |
+| ratings | **5** | 真实评分 |
+| resource_comments（B 站评论缓存） | **36** | 打开 B 站视频详情页会自动追加 |
 | categories | 2 | 人工智能、B站视频（`模拟类别*` 已清除） |
 
 > ⚠️ **这些数字一定会「长大」，别当固定值报**：1.7 节或第 3 幕里执行 `python online.py ...`、在搜索页滚到底、
@@ -403,8 +403,7 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/auth/register -Method Post `
 > 所以无限滚动在本机实际表现是「**自动追加一批（十几条）在线内容，然后停止**」，而不是连续翻十页。
 > 说它是「本地耗尽后自动补一批 B 站实时内容」是准确的；说「会一直往后翻」是不准确的。
 
-**顺手讲的三个设计点（全是决策记录原文）**
-- **判重 + 幂等**（决策 **#29**）：落库按 `source_url` 判重，命中**不新增行**，只刷新 `view_count` / `metadata`，所以标题、简介等平台侧人工编辑不会被覆盖。用命令行验证：
+**顺手讲的三个设计点（全是决策记录原文）**- **判重 + 幂等**（决策 **#29**）：落库按 `source_url` 判重，命中**不新增行**，只刷新 `view_count` / `metadata`，所以标题、简介等平台侧人工编辑不会被覆盖。用命令行验证：
 
   ```powershell
   cd E:\work\learn\edurec-platform\backend
@@ -417,6 +416,13 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/auth/register -Method Post `
   差异只剩「落库 type」和「source_url 怎么来」两个参数。
 - **合规边界**（决策 **#28 / #30**）：走官方 JSON 接口、不解析 HTML、`buvid3` 靠访问首页获取而**不伪造设备指纹**、
   30s 子进程超时、风控 `-352/-412` **不重试**、`search_max_pages` 防无界爬取。
+- **内容质量闸门（教育分区白名单）**：B 站搜索是**按关键词返回**的，不区分内容性质 ——
+  搜非教育主题（如影视剧角色名）会把影视剪辑、娱乐杂谈、网络游戏一并返回。
+  因此落库前按 B 站**分区名** `metadata.typename` 做白名单拦截
+  （`config.DefaultEducationalTypenames`，在线抓取与离线导入共用）。
+  **现场可以演示**：搜一个非教育关键词（如 `杨真真`），页面只会追加极少量命中、库内不新增影视内容；
+  而搜 `高等代数` 会正常入库。计数里的 `skipped_typenames` 就是被拦下的条数。
+  细节见 `docs/bilibili-import.md` 的「教育分区白名单」。
 
 **对应决策**：#28（外部内容来源）、#29（采集内容建模）、#30（在线搜索 + 评论 + 无限滚动）、#31（第三方数据集的对照）、#32（落库契约泛化）。
 **代码位置**：`frontend/src/pages/search/SearchPage.vue`（`canCrawlOnline` / `loadMore` / `fetchOnline`）→ `backend/internal/service/resource.go` 的 `List()`（`OnlinePage > 0` 分支）→ `backend/internal/service/bilibili_online.go`。

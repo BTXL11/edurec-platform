@@ -93,7 +93,7 @@ go run ./cmd/import_bilibili [-file data/bilibili/latest.json] [-dry-run]
 输出统计：
 
 ```
-[import_bilibili] 新增资源 27 条，刷新资源 0 条，跳过 0 条，新建分类 1 个
+[import_bilibili] 新增资源 27 条，刷新资源 0 条，跳过 0 条，非教育分区拦截 0 条，新建分类 1 个
 ```
 
 | 计数 | 含义 |
@@ -101,7 +101,44 @@ go run ./cmd/import_bilibili [-file data/bilibili/latest.json] [-dry-run]
 | `created_resources` | 新插入的 `type=video` 资源 |
 | `updated_resources` | `source_url` 命中已有记录，只刷新了动态字段 |
 | `skipped_resources` | 缺必填字段（`bvid` / `title` / `category`），未落库 |
+| `skipped_typenames` | **非教育分区被白名单拦下**，未落库（见下一节） |
 | `created_categories` | 按名称找不到、本次新建的分类 |
+
+## 教育分区白名单（内容质量闸门）
+
+B 站搜索是**按关键词返回**的，不区分内容性质。搜「杨真真」会把《夏家三千金》影视剪辑、
+娱乐杂谈、网络游戏等一并返回；这些条目若直接落库，就会和正常课程一起出现在首页与搜索页。
+因此落库前按 **B 站分区名（`typename`）白名单**拦截。
+
+- **判定依据**：爬虫在 `metadata.typename` 里写了 B 站分区名（`collect.py` 取搜索结果的 `typename`）。
+- **生效范围**：在线搜索抓取与离线导入**共用同一套**（都走 `CrawlImportService.ImportItems`）；
+  第三方数据集条目没有 `typename` 字段，**不受影响**。
+- **配置**：`backend/configs/config.yaml` 的 `bilibili.allowed_typenames`。
+  不写这一项 → 用代码内默认白名单（`config.DefaultEducationalTypenames`）；写 `[]` 表示不过滤（不推荐）。
+
+白名单之所以不能"只留校园学习"，是因为 B 站对正经课程的误分类非常普遍。实测（2026-09-19）：
+
+| 分区 | 为什么保留 |
+|---|---|
+| `校园学习` / `计算机技术` / `科学科普` / `野生技能协会` | 明确的教学与知识分区 |
+| `人文历史` / `社科·法律·心理` | 通识学科内容 |
+| `日常` / `数码` / `运动文化` / `竞技体育` | **误分类重灾区**：「数学分析」「泛函分析」「高等代数」「数学建模国赛」都被归进这些分区 |
+| `软件应用` / `职业职场` / `科工机械` / `财经商业` | 技能与职业教育向：「机器学习」「数据分析」教程落在这里 |
+
+刻意**不**收录：`其他`（内容不可控）、`预告·资讯`、`原创音乐`、
+`影视剪辑`/`影视杂谈`/`娱乐粉丝创作`/`娱乐杂谈`/`明星综合`/`网络游戏`/`音乐综合` 等。
+未收录的分区一律不导入 —— 新分区默认拦住，宁可漏也不要放回非教育内容。
+
+> ⚠️ **白名单是关键词搜索的兜底，不是万能的**：分区本身也可能误标（实测有数学视频被归进「搞笑」），
+> 因此仍可能有少量非教育条目落进白名单分区。发现后按标题清理即可：
+>
+> ```sql
+> -- 先查（把关键词换成要清理的主题）
+> SELECT id, title, JSON_UNQUOTE(JSON_EXTRACT(metadata,'$.typename')) tn
+> FROM resources WHERE title REGEXP '关键词1|关键词2';
+> -- 确认后删（有行为/评分引用时需先删引用行，外键会拦住）
+> DELETE FROM resources WHERE title REGEXP '关键词1|关键词2';
+> ```
 
 ## 字段映射
 

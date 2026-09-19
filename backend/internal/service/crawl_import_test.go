@@ -414,3 +414,91 @@ func TestBilibiliImportMapsRepoErrors(t *testing.T) {
 		assertErrorCode(t, err, apperror.CodeInternal)
 	})
 }
+
+// 分区白名单：B 站搜索结果会带上非教育分区（影视/娱乐/游戏等），必须在落库前拦掉
+func TestCrawlImportRejectsDisallowedTypenames(t *testing.T) {
+	file := `{
+  "version": 1,
+  "source": "bilibili",
+  "items": [
+    {"bvid": "BVedu", "title": "高等数学 全程教学", "source_url": "https://www.bilibili.com/video/BVedu",
+     "category": "B站视频", "metadata": {"typename": "校园学习"}},
+    {"bvid": "BVdrama", "title": "杨真真黑化复仇", "source_url": "https://www.bilibili.com/video/BVdrama",
+     "category": "B站视频", "metadata": {"typename": "影视剪辑"}},
+    {"bvid": "BVgame", "title": "某游戏实况", "source_url": "https://www.bilibili.com/video/BVgame",
+     "category": "B站视频", "metadata": {"typename": "网络游戏"}}
+  ]
+}`
+
+	resources, categories := newBilibiliRepos()
+	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, file), "校园学习")
+
+	result, err := svc.Import()
+
+	if err != nil {
+		t.Fatalf("Import() error = %v", err)
+	}
+	if result.CreatedResources != 1 {
+		t.Fatalf("CreatedResources = %d, want 1（只有校园学习应入库）", result.CreatedResources)
+	}
+	if result.SkippedTypenames != 2 {
+		t.Fatalf("SkippedTypenames = %d, want 2（影视剪辑 + 网络游戏）", result.SkippedTypenames)
+	}
+	if len(resources.created) != 1 || resources.created[0].Title != "高等数学 全程教学" {
+		t.Fatalf("created = %+v, want 仅高等数学", resources.created)
+	}
+}
+
+// 白名单为空 = 不过滤（保持既有行为）；大小写与前后空格应被忽略
+func TestCrawlImportTypenameAllowlistEdgeCases(t *testing.T) {
+	t.Run("白名单为空时不过滤", func(t *testing.T) {
+		resources, categories := newBilibiliRepos()
+		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{
+  "version": 1, "source": "bilibili", "items": [
+    {"bvid": "BVdrama", "title": "影视剪辑内容", "source_url": "https://www.bilibili.com/video/BVdrama",
+     "category": "B站视频", "metadata": {"typename": "影视剪辑"}}
+  ]}`))
+
+		result, err := svc.Import()
+		if err != nil {
+			t.Fatalf("Import() error = %v", err)
+		}
+		if result.CreatedResources != 1 || result.SkippedTypenames != 0 {
+			t.Fatalf("stats = %+v, want 1 created / 0 typename-skipped", result)
+		}
+	})
+
+	t.Run("大小写与空格无关", func(t *testing.T) {
+		resources, categories := newBilibiliRepos()
+		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{
+  "version": 1, "source": "bilibili", "items": [
+    {"bvid": "BVx", "title": "科技区内容", "source_url": "https://www.bilibili.com/video/BVx",
+     "category": "B站视频", "metadata": {"typename": "  科学科普  "}}
+  ]}`), " 科学科普 ")
+
+		result, err := svc.Import()
+		if err != nil {
+			t.Fatalf("Import() error = %v", err)
+		}
+		if result.CreatedResources != 1 || result.SkippedTypenames != 0 {
+			t.Fatalf("stats = %+v, want 1 created（空白与大小写应被忽略）", result)
+		}
+	})
+
+	t.Run("条目没有 typename 时放行（第三方数据集无此字段）", func(t *testing.T) {
+		resources, categories := newBilibiliRepos()
+		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{
+  "version": 1, "source": "mooc", "items": [
+    {"source_id": "course-1", "title": "数据结构", "source_url": "https://example.com/c/1",
+     "category": "慕课课程", "metadata": {"obj_id": "c1"}}
+  ]}`), "校园学习")
+
+		result, err := svc.Import()
+		if err != nil {
+			t.Fatalf("Import() error = %v", err)
+		}
+		if result.CreatedResources != 1 || result.SkippedTypenames != 0 {
+			t.Fatalf("stats = %+v, want 1 created（无 typename 不应被分区过滤拦下）", result)
+		}
+	})
+}

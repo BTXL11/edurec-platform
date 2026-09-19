@@ -37,6 +37,7 @@ func main() {
 		repository.NewResourceRepository(db),
 		repository.NewCategoryRepository(db),
 		*filePath,
+		cfg.Bilibili.AllowedTypenamesOrDefault()...,
 	)
 
 	var result *service.CrawlImportResult
@@ -54,7 +55,7 @@ func main() {
 		fmt.Printf("%s --dry-run：未写库\n", prefix)
 	}
 	fmt.Printf("%s 文件：%s\n", prefix, *filePath)
-	fmt.Printf("%s 新增资源 %d 条，刷新资源 %d 条，跳过 %d 条，新建分类 %d 个\n",
+	fmt.Printf("%s 新增资源 %d 条，刷新资源 %d 条，跳过 %d 条，非教育分区拦截 %d 条，新建分类 %d 个\n",
 		prefix, result.CreatedResources, result.UpdatedResources,
-		result.SkippedResources, result.CreatedCategories)
+		result.SkippedResources, result.SkippedTypenames, result.CreatedCategories)
 }

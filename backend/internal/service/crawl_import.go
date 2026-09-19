@@ -25,21 +25,76 @@ type CrawlImportService struct {
 	resources  repository.ResourceRepository
 	categories repository.CategoryRepository
 	filePath   string
+	// allowedTypenames 允许入库的来源分区白名单（小写，便于大小写无关比较）。
+	// 为空表示不按分区过滤；只对 metadata 里带 typename 的条目生效（即 B 站采集）。
+	allowedTypenames map[string]struct{}
 }
 
 func NewCrawlImportService(
 	resources repository.ResourceRepository,
 	categories repository.CategoryRepository,
 	filePath string,
+	allowedTypenames ...string,
 ) *CrawlImportService {
-	return &CrawlImportService{resources: resources, categories: categories, filePath: filePath}
+	return &CrawlImportService{
+		resources:        resources,
+		categories:       categories,
+		filePath:         filePath,
+		allowedTypenames: newTypenameSet(allowedTypenames),
+	}
+}
+
+// newTypenameSet 把白名单规格化成查表用的集合；忽略空白项
+func newTypenameSet(names []string) map[string]struct{} {
+	if len(names) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if key := strings.ToLower(strings.TrimSpace(name)); key != "" {
+			set[key] = struct{}{}
+		}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	return set
+}
+
+// typenameAllowed 判断条目是否通过分区白名单。
+// 未配置白名单、或条目本身没有 typename（如第三方数据集）时一律放行；
+// 只有明确给出了不在白名单内的分区才拦下，避免非教育内容被搜索关键词带进库。
+func (s *CrawlImportService) typenameAllowed(item CrawlItem) bool {
+	if len(s.allowedTypenames) == 0 {
+		return true
+	}
+	typename := metadataString(item.Metadata, "typename")
+	if typename == "" {
+		return true
+	}
+	_, ok := s.allowedTypenames[strings.ToLower(typename)]
+	return ok
+}
+
+// metadataString 从 item.Metadata 里取一个字符串字段（缺失/非字符串返回空串）
+func metadataString(metadata map[string]any, key string) string {
+	if metadata == nil {
+		return ""
+	}
+	value, ok := metadata[key]
+	if !ok {
+		return ""
+	}
+	text, _ := value.(string)
+	return strings.TrimSpace(text)
 }
 
 // CrawlImportResult 导入统计
 type CrawlImportResult struct {
 	CreatedResources  int `json:"created_resources"`
 	UpdatedResources  int `json:"updated_resources"`
-	SkippedResources  int `json:"skipped_resources"` // 缺必填字段，未落库
+	SkippedResources  int `json:"skipped_resources"`   // 缺必填字段，未落库
+	SkippedTypenames  int `json:"skipped_typenames"`   // 非教育分区，按白名单拦下（见 BilibiliConfig.AllowedTypenames）
 	CreatedCategories int `json:"created_categories"`
 }
 
@@ -171,6 +226,12 @@ func (s *CrawlImportService) ImportItems(
 	result := &CrawlImportResult{}
 	records := make([]crawlRecord, 0, len(items))
 	for _, item := range items {
+		// 先按来源分区过滤：B 站搜索结果会混入影视/娱乐/游戏等非教育内容，
+		// 必须在落库前拦掉，否则它们会和正常课程一起出现在首页与搜索页。
+		if !s.typenameAllowed(item) {
+			result.SkippedTypenames++
+			continue
+		}
 		record, ok := newCrawlRecord(item, opts.SourceURLTemplate)
 		if !ok {
 			result.SkippedResources++

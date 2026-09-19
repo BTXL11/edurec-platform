@@ -44,6 +44,13 @@ bilibili:
   # 单个关键词的总上限 = search_limit × search_max_pages = 20 × 10 = 200 条
   search_max_pages: 10
   comment_limit: 20
+  # 允许入库的 B 站分区白名单：B 站按关键词返回结果，影视/娱乐/游戏等非教育
+  # 分区会随关键词一起被抓进来，必须在落库前拦掉（在线抓取与离线导入共用同一套）。
+  # 不写这一项 → 使用代码内默认的教育分区白名单（config.DefaultEducationalTypenames）；
+  # 想放开某个分区就加进列表；写 [] 表示完全不过滤（不推荐）。
+  # allowed_typenames:
+  #   - 校园学习
+  #   - 计算机技术
 
 # 第三方数据集导入（cmd/import_dataset）。各家数据集的字段名和格式都不一样，
 # 所以对应关系全部写在下面，换数据集只改这一段，不动代码。

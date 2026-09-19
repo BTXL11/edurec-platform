@@ -118,6 +118,54 @@ type BilibiliConfig struct {
 	SearchLimit    int    `mapstructure:"search_limit"`     // 单次搜索导入条数
 	SearchMaxPages int    `mapstructure:"search_max_pages"` // 无限滚动时最多翻 B 站页数，防无界爬取
 	CommentLimit   int    `mapstructure:"comment_limit"`    // 单次评论抓取条数
+	// AllowedTypenames 允许入库的 B 站分区名白名单。B 站搜索结果按关键词返回，
+	// 非教育分区（影视剪辑/娱乐/游戏/音乐等）会随关键词一起被抓进来，必须在落库前拦掉。
+	// 留空表示不限制（不推荐）。见 DefaultEducationalTypenames。
+	AllowedTypenames []string `mapstructure:"allowed_typenames"`
+}
+
+// DefaultEducationalTypenames 教育向的 B 站分区白名单（配置未显式给出 allowed_typenames 时生效）。
+//
+// 取值依据（2026-09-19 实测两部分数据）：
+//   - 清理后 edurec 库里保留资源的真实分区分布；
+//   - 用「机器学习/雅思/高等数学/数据结构/数学/人工智能/数据分析/公开课/心理学/线性代数」
+//     等教育关键词实际调用 B 站搜索，统计返回条目的分区。
+//
+// 收录原则：教学与知识类，以及 B 站对正经课程的高频误分类分区。
+//   - 校园学习 / 计算机技术 / 科学科普 / 野生技能协会：明确的教学与知识分区；
+//   - 人文历史 / 社科·法律·心理：通识学科内容；
+//   - 日常 / 数码 / 运动文化 / 竞技体育：误分类重灾区（实测「数学分析」「泛函分析」
+//     「高等代数」「数学建模」等课程被归入这些分区）；
+//   - 软件应用 / 职业职场 / 科工机械 / 财经商业：技能与职业教育向
+//     （实测「机器学习」「数据分析」「人工智能」的教程落在这里）。
+//
+// 刻意不收录：「其他」内容不可控；「预告·资讯」「原创音乐」等非教学分区。
+// 未收录的分区一律不导入——新分区默认拦住，宁可漏也不要放回非教育内容。
+var DefaultEducationalTypenames = []string{
+	"校园学习",
+	"计算机技术",
+	"科学科普",
+	"野生技能协会",
+	"人文历史",
+	"社科·法律·心理",
+	"日常",
+	"数码",
+	"运动文化",
+	"竞技体育",
+	"软件应用",
+	"职业职场",
+	"科工机械",
+	"财经商业",
+}
+
+// AllowedTypenamesOrDefault 返回生效的 B 站分区白名单：
+// 配置里显式给了就用配置的，否则回退到 DefaultEducationalTypenames。
+// 两者都为空表示不限制分区（不推荐）。
+func (b BilibiliConfig) AllowedTypenamesOrDefault() []string {
+	if len(b.AllowedTypenames) == 0 {
+		return DefaultEducationalTypenames
+	}
+	return b.AllowedTypenames
 }
 
 // ServerConfig HTTP 服务器配置
