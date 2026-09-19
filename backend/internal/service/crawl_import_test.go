@@ -9,10 +9,28 @@ import (
 	"testing"
 
 	"github.com/Shionyori/edurec-platform/backend/internal/apperror"
+	"github.com/Shionyori/edurec-platform/backend/internal/config"
 	"github.com/Shionyori/edurec-platform/backend/internal/model"
+	"github.com/Shionyori/edurec-platform/backend/internal/repository"
 	"github.com/Shionyori/edurec-platform/backend/internal/service"
 	"gorm.io/gorm"
 )
+
+// newCrawlImportService 按当前构造签名建服务。
+// 不传 courseRules → 零值经 CourseRulesOrDefault() 回退到默认归类规则
+//（标题带课程/合集标记且时长 ≥ 120 分钟判为 course），与生产配置一致。
+func newCrawlImportService(
+	resources *recordingResourceRepo,
+	categories repository.CategoryRepository,
+	filePath string,
+	allowedTypenames ...[]string,
+) *service.CrawlImportService {
+	var typed []string
+	if len(allowedTypenames) > 0 {
+		typed = allowedTypenames[0]
+	}
+	return service.NewCrawlImportService(resources, categories, filePath, typed, config.ContentRulesConfig{})
+}
 
 // recordingResourceRepo 复用完整 fake，额外记录全部写入，便于断言字段映射
 type recordingResourceRepo struct {
@@ -86,7 +104,7 @@ const oneItemFile = `{
 
 func TestBilibiliImportCreatesResource(t *testing.T) {
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
 
 	result, err := svc.Import()
 
@@ -137,7 +155,7 @@ func TestBilibiliImportCreatesResource(t *testing.T) {
 
 func TestBilibiliImportDerivesSourceURLFromBvid(t *testing.T) {
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, `{
       "items": [{"bvid": "BV1xx411c7mD", "title": "无来源链接", "category": "人工智能"}]
     }`))
 
@@ -153,7 +171,7 @@ func TestBilibiliImportDerivesSourceURLFromBvid(t *testing.T) {
 // 且落库 type 与 URL 模板都由调用方通过 CrawlImportOptions 指定。
 func TestCrawlImportAcceptsSourceIDAndCustomOptions(t *testing.T) {
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories, "")
+	svc := newCrawlImportService(resources, categories, "")
 
 	result, imported, err := svc.ImportItems([]service.CrawlItem{{
 		SourceID:  "1273",
@@ -188,7 +206,7 @@ func TestCrawlImportAcceptsSourceIDAndCustomOptions(t *testing.T) {
 // source_id 与 bvid 都为空时无法判重，必须跳过而非插入（否则每次导入都会重复建行）
 func TestCrawlImportSkipsItemWithoutIdentity(t *testing.T) {
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories, "")
+	svc := newCrawlImportService(resources, categories, "")
 
 	result, imported, err := svc.ImportItems([]service.CrawlItem{{
 		Title:    "没有身份键",
@@ -218,7 +236,7 @@ func TestBilibiliImportRefreshesExistingResource(t *testing.T) {
 		ViewCount: 1,
 		Metadata:  "{}",
 	}}
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
 
 	result, err := svc.Import()
 
@@ -252,7 +270,7 @@ func TestBilibiliImportRefreshesExistingResource(t *testing.T) {
 
 func TestBilibiliImportSkipsInvalidItems(t *testing.T) {
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, `{
       "items": [
         {"bvid": "BV1", "title": "缺少分类", "category": ""},
         {"bvid": "BV2", "title": "  ", "category": "人工智能"},
@@ -277,7 +295,7 @@ func TestBilibiliImportReusesExistingCategory(t *testing.T) {
 	resources, categories := newBilibiliRepos()
 	categories.categories = []model.Category{{Model: gorm.Model{ID: 42}, Name: "人工智能"}}
 	categories.nextID = 42
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
 
 	result, err := svc.Import()
 
@@ -295,7 +313,7 @@ func TestBilibiliImportReusesExistingCategory(t *testing.T) {
 func TestBilibiliImportTruncatesLongFields(t *testing.T) {
 	resources, categories := newBilibiliRepos()
 	long := strings.Repeat("测", 300)
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t,
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t,
 		`{"items": [{"bvid": "BV1", "title": "`+long+`", "author": "`+long+`", "category": "人工智能"}]}`))
 
 	if _, err := svc.Import(); err != nil {
@@ -312,7 +330,7 @@ func TestBilibiliImportTruncatesLongFields(t *testing.T) {
 
 func TestBilibiliImportPreviewDoesNotWrite(t *testing.T) {
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
 
 	result, err := svc.Preview()
 
@@ -329,7 +347,7 @@ func TestBilibiliImportPreviewDoesNotWrite(t *testing.T) {
 
 func TestBilibiliImportEmptyFileReturnsEmptyResult(t *testing.T) {
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{"items": []}`))
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, `{"items": []}`))
 
 	result, err := svc.Import()
 
@@ -343,7 +361,7 @@ func TestBilibiliImportEmptyFileReturnsEmptyResult(t *testing.T) {
 
 func TestBilibiliImportMissingFileReturnsError(t *testing.T) {
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories,
+	svc := newCrawlImportService(resources, categories,
 		filepath.Join(t.TempDir(), "not-exist.json"))
 
 	_, err := svc.Import()
@@ -352,7 +370,7 @@ func TestBilibiliImportMissingFileReturnsError(t *testing.T) {
 
 func TestBilibiliImportMalformedJSONReturnsError(t *testing.T) {
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{not-json`))
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, `{not-json`))
 
 	_, err := svc.Import()
 	assertErrorCode(t, err, apperror.CodeInternal)
@@ -364,7 +382,7 @@ func TestBilibiliImportMapsRepoErrors(t *testing.T) {
 	t.Run("FindBySourceURLs", func(t *testing.T) {
 		resources, categories := newBilibiliRepos()
 		resources.findByURLsErr = boom
-		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
+		svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
 
 		_, err := svc.Import()
 		assertErrorCode(t, err, apperror.CodeInternal)
@@ -373,7 +391,7 @@ func TestBilibiliImportMapsRepoErrors(t *testing.T) {
 	t.Run("Create", func(t *testing.T) {
 		resources, categories := newBilibiliRepos()
 		resources.createErr = boom
-		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
+		svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
 
 		_, err := svc.Import()
 		assertErrorCode(t, err, apperror.CodeInternal)
@@ -386,7 +404,7 @@ func TestBilibiliImportMapsRepoErrors(t *testing.T) {
 			SourceURL: "https://www.bilibili.com/video/BV1DgxCzREbM",
 		}}
 		resources.updateErr = boom
-		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
+		svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
 
 		_, err := svc.Import()
 		assertErrorCode(t, err, apperror.CodeInternal)
@@ -395,7 +413,7 @@ func TestBilibiliImportMapsRepoErrors(t *testing.T) {
 	t.Run("FindByName", func(t *testing.T) {
 		resources, _ := newBilibiliRepos()
 		categories := &errCategoryRepo{fakeCategoryRepository: &fakeCategoryRepository{}, findErr: boom}
-		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
+		svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
 
 		_, err := svc.Import()
 		assertErrorCode(t, err, apperror.CodeInternal)
@@ -408,7 +426,7 @@ func TestBilibiliImportMapsRepoErrors(t *testing.T) {
 			findErr:                errors.New("not found"),
 			createErr:              boom,
 		}
-		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
+		svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, oneItemFile))
 
 		_, err := svc.Import()
 		assertErrorCode(t, err, apperror.CodeInternal)
@@ -431,7 +449,7 @@ func TestCrawlImportRejectsDisallowedTypenames(t *testing.T) {
 }`
 
 	resources, categories := newBilibiliRepos()
-	svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, file), "校园学习")
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, file), []string{"校园学习"})
 
 	result, err := svc.Import()
 
@@ -453,7 +471,7 @@ func TestCrawlImportRejectsDisallowedTypenames(t *testing.T) {
 func TestCrawlImportTypenameAllowlistEdgeCases(t *testing.T) {
 	t.Run("白名单为空时不过滤", func(t *testing.T) {
 		resources, categories := newBilibiliRepos()
-		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{
+		svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, `{
   "version": 1, "source": "bilibili", "items": [
     {"bvid": "BVdrama", "title": "影视剪辑内容", "source_url": "https://www.bilibili.com/video/BVdrama",
      "category": "B站视频", "metadata": {"typename": "影视剪辑"}}
@@ -470,11 +488,11 @@ func TestCrawlImportTypenameAllowlistEdgeCases(t *testing.T) {
 
 	t.Run("大小写与空格无关", func(t *testing.T) {
 		resources, categories := newBilibiliRepos()
-		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{
+		svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, `{
   "version": 1, "source": "bilibili", "items": [
     {"bvid": "BVx", "title": "科技区内容", "source_url": "https://www.bilibili.com/video/BVx",
      "category": "B站视频", "metadata": {"typename": "  科学科普  "}}
-  ]}`), " 科学科普 ")
+  ]}`), []string{" 科学科普 "})
 
 		result, err := svc.Import()
 		if err != nil {
@@ -487,11 +505,11 @@ func TestCrawlImportTypenameAllowlistEdgeCases(t *testing.T) {
 
 	t.Run("条目没有 typename 时放行（第三方数据集无此字段）", func(t *testing.T) {
 		resources, categories := newBilibiliRepos()
-		svc := service.NewCrawlImportService(resources, categories, writeBilibiliFile(t, `{
+		svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, `{
   "version": 1, "source": "mooc", "items": [
     {"source_id": "course-1", "title": "数据结构", "source_url": "https://example.com/c/1",
      "category": "慕课课程", "metadata": {"obj_id": "c1"}}
-  ]}`), "校园学习")
+  ]}`), []string{"校园学习"})
 
 		result, err := svc.Import()
 		if err != nil {
@@ -501,4 +519,74 @@ func TestCrawlImportTypenameAllowlistEdgeCases(t *testing.T) {
 			t.Fatalf("stats = %+v, want 1 created（无 typename 不应被分区过滤拦下）", result)
 		}
 	})
+}
+
+// 导入时按规则自动判类型：B 站长合集落 course，短片仍落 video。
+// 这条保证「每次新内容进来都会判一次」，不用事后跑迁移脚本。
+func TestCrawlImportInfersCourseTypeForLongCompilations(t *testing.T) {
+	file := `{
+  "version": 1,
+  "source": "bilibili",
+  "items": [
+    {"bvid": "BVlong", "title": "数学分析（第三版）-复旦大学-陈纪修教授(全198集)",
+     "source_url": "https://www.bilibili.com/video/BVlong", "category": "B站视频",
+     "metadata": {"typename": "校园学习", "duration": "9003:20"}},
+    {"bvid": "BVshort", "title": "17分钟看懂所有机器学习算法",
+     "source_url": "https://www.bilibili.com/video/BVshort", "category": "B站视频",
+     "metadata": {"typename": "校园学习", "duration": "17:30"}},
+    {"bvid": "BVplain", "title": "2026数学建模国赛B题可视化",
+     "source_url": "https://www.bilibili.com/video/BVplain", "category": "B站视频",
+     "metadata": {"typename": "校园学习", "duration": "5000:00"}}
+  ]
+}`
+
+	resources, categories := newBilibiliRepos()
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, file), []string{"校园学习"})
+
+	if _, err := svc.Import(); err != nil {
+		t.Fatalf("Import() error = %v", err)
+	}
+	if len(resources.created) != 3 {
+		t.Fatalf("created = %d 条, want 3", len(resources.created))
+	}
+
+	byTitle := map[string]string{}
+	for _, r := range resources.created {
+		byTitle[r.Title] = r.Type
+	}
+
+	if got := byTitle["数学分析（第三版）-复旦大学-陈纪修教授(全198集)"]; got != "course" {
+		t.Errorf("长合集 Type = %q, want course（含集数标注且时长 9003 分钟）", got)
+	}
+	if got := byTitle["17分钟看懂所有机器学习算法"]; got != "video" {
+		t.Errorf("短片 Type = %q, want video（时长不足阈值，标题也不含课程/合集标记）", got)
+	}
+	// 长但没有任何课程/合集标记：不归入课程，避免把长直播录像也算成课
+	if got := byTitle["2026数学建模国赛B题可视化"]; got != "video" {
+		t.Errorf("无标记长视频 Type = %q, want video", got)
+	}
+}
+
+// 非 B 站来源（无 typename，如第三方数据集）不参与「长合集」判定，沿用 opts.ResourceType
+func TestCrawlImportDoesNotInferTypeForNonBilibili(t *testing.T) {
+	file := `{
+  "version": 1, "source": "mooc", "items": [
+    {"source_id": "c1", "title": "高等数学（全200集）课程讲解", "source_url": "https://example.com/c/1",
+     "category": "慕课课程", "metadata": {"obj_id": "c1", "duration": "9003:20"}}
+  ]
+}`
+
+	resources, categories := newBilibiliRepos()
+	svc := newCrawlImportService(resources, categories, writeBilibiliFile(t, file))
+
+	if _, err := svc.Import(); err != nil {
+		t.Fatalf("Import() error = %v", err)
+	}
+	if len(resources.created) != 1 {
+		t.Fatalf("created = %d 条, want 1", len(resources.created))
+	}
+	// 即使标题与时长都像长课程，数据集来源仍按自身声明的 type 落库
+	if got := resources.created[0].Type; got != "video" {
+		t.Errorf("Type = %q, want video（非 B 站来源不做长合集判定）", got)
+	}
 }

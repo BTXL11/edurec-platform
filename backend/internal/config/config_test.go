@@ -83,3 +83,89 @@ func TestAllowedTypenamesOrDefault(t *testing.T) {
 		}
 	})
 }
+
+// 长合集/课程判定：每次导入都会对每条 B 站内容跑一次，口径要稳。
+// duration 取自 B 站采集的 "分钟:秒"（见 crawler/collect.py 的 _format_duration）。
+func TestIsLongCourse(t *testing.T) {
+	rules := config.ContentRulesConfig{}.CourseRulesOrDefault()
+
+	if rules.CourseMinMinutes != config.DefaultCourseMinMinutes {
+		t.Fatalf("CourseMinMinutes = %d, want %d", rules.CourseMinMinutes, config.DefaultCourseMinMinutes)
+	}
+
+	cases := []struct {
+		name     string
+		title    string
+		duration string
+		want     bool
+	}{
+		{"合集 + 长时长", "北大丘维声教授清华高等代数课程1080P高清修复版(全151集)", "3535:14", true},
+		{"全集 + 长时长", "高等代数 丘维声老师 超高清修复版（全集）", "3535:14", true},
+		{"课程 + 长时长", "【官方中英】2025年公认最好的【吴恩达机器学习课程】附课件", "1384:00", true},
+		{"精讲 + 长时长", "【数学分析】课后习题精讲 华东师范大学 第五版 考研复习", "6389:00", true},
+		{"集数标注 + 长时长", "数学分析（第三版）-复旦大学-陈纪修教授1080P高清(全198集)", "9003:20", true},
+		{"讲数标注 + 长时长", "大连理工大学 力学中的泛函分析与变分原理 全43讲", "985:30", true},
+		// 弱关键词档（教程/讲解）：需 ≥ 600 分钟（10 小时）
+		{"教程 + 49 小时", "【Autolabor初级教程】ROS机器人入门", "2955:00", true},
+		{"讲解 + 23 小时", "【2026版机器学习】周志华机器学习亲讲-西瓜书全网最详讲解", "1413:45", true},
+		{"教程但只有 2 小时", "某入门教程", "120:00", false},
+		{"讲解但只有 6 小时", "某某讲解", "360:00", false},
+		{"教程恰好 10 小时", "某系统教程", "600:00", true},
+		{"教程差 1 分钟到 10 小时", "某系统教程", "599:59", false},
+		// 时长不达标：B 站大量短片标题写着「教程/全集」，必须靠时长拦住
+		{"教程但只有 17 分钟", "2025新版【机器学习入门教程】17分钟让你看懂所有机器学习算法", "17:30", false},
+		{"合集但时长不足阈值", "线性代数合集（上）", "119:59", false},
+		{"课程但时长不足", "数学系最重要的基础课程之一——抽象代数教材推荐", "9:00", false},
+		{"边界正好等于阈值", "线性代数合集（上）", "120:00", true},
+		// 长但没有课程/合集标记：不属于本规则，仍按 video 落库
+		{"长时长但无任何标记", "2026数学建模国赛B题可视化", "5000:00", false},
+		// 「17分钟」不得被当成集数标注（曾因宽松正则误判）
+		{"短片标题含「17分钟」", "17分钟让你看懂所有机器学习算法", "17:00", false},
+		// 时长缺失或非法：不判为课程（宁可保守）
+		{"课程但时长缺失", "某课程", "", false},
+		{"课程但时长非法", "某课程", "abc", false},
+		{"空标题", "", "5000:00", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := rules.IsLongCourse(tc.title, tc.duration); got != tc.want {
+				t.Errorf("IsLongCourse(%q, %q) = %v, want %v", tc.title, tc.duration, got, tc.want)
+			}
+		})
+	}
+}
+
+// 规则可配置：改配置即改口径，不用改代码
+func TestIsLongCourseRespectsCustomRules(t *testing.T) {
+	rules := config.ContentRulesConfig{
+		CourseMinMinutes:   60,
+		CourseKeywords:     []string{"公开课"},
+		CollectionMarkers:  []string{"专题"},
+		LongformKeywords:   []string{"讲座"},
+		LongformMinMinutes: 30,
+	}
+
+	if !rules.IsLongCourse("某公开课", "61:00") {
+		t.Error("自定义关键词 + 达阈值应判为课程")
+	}
+	if rules.IsLongCourse("某公开课", "59:00") {
+		t.Error("低于自定义阈值不应判为课程")
+	}
+	// 自定义规则替换了默认集合，默认关键词不再生效
+	if rules.IsLongCourse("某课程", "500:00") {
+		t.Error("自定义强词集合下默认关键词不应生效")
+	}
+	// 自定义弱词档门槛同样生效
+	if !rules.IsLongCourse("某讲座", "31:00") {
+		t.Error("自定义弱词 + 达其阈值应判为课程")
+	}
+	if rules.IsLongCourse("某讲座", "29:00") {
+		t.Error("低于自定义弱词阈值不应判为课程")
+	}
+	// 默认弱词「教程」已被替换掉，不应再命中
+	if rules.IsLongCourse("某教程", "900:00") {
+		t.Error("自定义弱词集合下默认的「教程」不应生效")
+	}
+}
+

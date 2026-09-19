@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Shionyori/edurec-platform/backend/internal/model"
@@ -11,13 +13,14 @@ import (
 
 // Config 是应用的顶层配置
 type Config struct {
-	Server   ServerConfig             `mapstructure:"server"`
-	Database DatabaseConfig           `mapstructure:"database"`
-	Redis    RedisConfig              `mapstructure:"redis"`
-	JWT      JWTConfig                `mapstructure:"jwt"`
-	Engine   EngineConfig             `mapstructure:"engine"`
-	Bilibili BilibiliConfig           `mapstructure:"bilibili"`
-	Datasets map[string]DatasetConfig `mapstructure:"datasets"`
+	Server        ServerConfig             `mapstructure:"server"`
+	Database      DatabaseConfig           `mapstructure:"database"`
+	Redis         RedisConfig              `mapstructure:"redis"`
+	JWT           JWTConfig                `mapstructure:"jwt"`
+	Engine        EngineConfig             `mapstructure:"engine"`
+	Bilibili      BilibiliConfig           `mapstructure:"bilibili"`
+	ContentRules  ContentRulesConfig       `mapstructure:"content_rules"`
+	Datasets      map[string]DatasetConfig `mapstructure:"datasets"`
 }
 
 // 数据集字段映射支持的内部字段名。出现词表外的 key 一律报错：
@@ -166,6 +169,153 @@ func (b BilibiliConfig) AllowedTypenamesOrDefault() []string {
 		return DefaultEducationalTypenames
 	}
 	return b.AllowedTypenames
+}
+
+// ContentRulesConfig 内容归类规则：判断一条 B 站内容是否算「长合集/系统课程」，
+// 从而在导入时落库为 course（否则为 video）。全部可配置，改 YAML 即生效、不用改代码。
+type ContentRulesConfig struct {
+	// CourseMinMinutes 判定为课程的最短时长（分钟）。duration 形如 "2809:53"（分钟:秒）
+	CourseMinMinutes int `mapstructure:"course_min_minutes"`
+	// CourseKeywords 强关键词：命中即视为课程（子串匹配，如「课程」「精讲」）
+	CourseKeywords []string `mapstructure:"course_keywords"`
+	// CollectionMarkers 合集/系列标记（如「合集」「全集」「全N集」）；命中时只要时长达标也算课程
+	CollectionMarkers []string `mapstructure:"collection_markers"`
+	// LongformKeywords 弱关键词：「教程」「讲解」这类太泛、短片标题也常用的词。
+	// 它们只在时长达到 LongformMinMinutes（默认 10 小时）时才判为课程，
+	// 避免「17分钟让你看懂XX教程」这种短片被误判。
+	LongformKeywords []string `mapstructure:"longform_keywords"`
+	// LongformMinMinutes 弱关键词所需的最短时长（分钟）
+	LongformMinMinutes int `mapstructure:"longform_min_minutes"`
+}
+
+// 默认规则。实测校准（2026-09-19）：
+//   - 单看时长会把 174 条都算课程，连没写「课程」字样的长课也算；
+//   - 单看关键词会把 17 分钟的短片教程误判为课程（14 条）；
+//   - 「关键词且时长 >= 120 分钟」命中 52 条，逐条核对均为长课程/系列。
+const (
+	DefaultCourseMinMinutes = 120
+	// DefaultLongformMinMinutes 弱关键词（教程/讲解）所需的时长：10 小时。
+	// 取 600 是因为「教程」在 B 站短片标题里极常见，但能到 10 小时的必然是系统课程。
+	DefaultLongformMinMinutes = 600
+)
+
+var (
+	// DefaultCourseKeywords 只收「课程」「精讲」这类在 B 站细分领域里基本专指系统课的词。
+	//
+	// 刻意不收「教程」「讲解」进这一档：实测它们太泛，17 分钟短片也普遍这么写标题
+	//（如「17分钟让你看懂所有机器学习算法」写成【入门教程】）。用「课程|精讲」时：
+	// 时长 ≥ 120 分钟命中 50 条，而含这两个词却不足 120 分钟的仅 4 条，
+	// 且全是「盘点课程」「课后习题精讲」这类非课程内容，正好被时长条件挡住。
+	DefaultCourseKeywords = []string{"课程", "精讲"}
+
+	DefaultCollectionMarkers = []string{"合集", "全集", "全套", "系列"}
+
+	// DefaultLongformKeywords 弱关键词档：需要 ≥ 10 小时才判为课程。
+	// 实测（2026-09-19）这批额外收进 13 条 10 小时以上的长课，
+	// 包括 ROS 入门教程(49h)、高等代数讲解(32h)、周志华西瓜书讲解(23.5h)、
+	// 雅思词汇带背(19h)、离散数学讲解(24.6h)。
+	DefaultLongformKeywords = []string{"教程", "讲解"}
+)
+
+// CourseRulesOrDefault 返回生效的内容归类规则，未配置项回退到默认值
+func (r ContentRulesConfig) CourseRulesOrDefault() ContentRulesConfig {
+	out := r
+	if out.CourseMinMinutes <= 0 {
+		out.CourseMinMinutes = DefaultCourseMinMinutes
+	}
+	if len(out.CourseKeywords) == 0 {
+		out.CourseKeywords = DefaultCourseKeywords
+	}
+	if len(out.CollectionMarkers) == 0 {
+		out.CollectionMarkers = DefaultCollectionMarkers
+	}
+	if len(out.LongformKeywords) == 0 {
+		out.LongformKeywords = DefaultLongformKeywords
+	}
+	if out.LongformMinMinutes <= 0 {
+		out.LongformMinMinutes = DefaultLongformMinMinutes
+	}
+	return out
+}
+
+// IsLongCourse 判断一条内容是否算「长合集 / 系统课程」。
+//
+// 判定分两档，两档都要求时长达标：
+//   - 强标记（course_keywords / collection_markers / 「全N集」「共N讲」）≥ course_min_minutes；
+//   - 弱关键词（longform_keywords，如「教程」「讲解」）≥ longform_min_minutes（默认 10 小时）。
+//
+// 时长条件不可省：B 站大量「17分钟看完XX教程」的短片标题里也带「教程」，
+// 光看关键词会把它们误判成课程 —— 弱词档用更高的时长门槛解决这个问题。
+//
+// durationText 为 B 站采集的 duration 原值（"2809:53" 即 分钟:秒）。
+func (r ContentRulesConfig) IsLongCourse(title, durationText string) bool {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return false
+	}
+	minutes := parseDurationMinutes(durationText)
+
+	if minutes >= r.CourseMinMinutes {
+		if hasCourseMarker(title, r.CourseKeywords) ||
+			hasCourseMarker(title, r.CollectionMarkers) ||
+			episodeMarkPattern.MatchString(title) {
+			return true
+		}
+	}
+	if minutes >= r.LongformMinMinutes && hasCourseMarker(title, r.LongformKeywords) {
+		return true
+	}
+	return false
+}
+
+// episodeMarkPattern 匹配明确的集数/讲数标注：「全151集」「全198集」「共78集」「全39讲」。
+//
+// 两个刻意的写法约束：
+//   - 集/讲前必须是**ASCII 数字**。用 \d 会连中文数字一起匹配 ——
+//     「代**数**」「基础**课**程」里的「数」「课」都不是 [集讲]，但「…数学…集」这类组合会误命中；
+//   - 只认带「全/共」前缀的写法，避免把「17分钟让你看懂…」里的「17分」当集数。
+var episodeMarkPattern = regexp.MustCompile(`(?:全|共)\s*[0-9]+\s*[集讲]`)
+
+func hasCourseMarker(title string, markers []string) bool {
+	for _, marker := range markers {
+		if marker != "" && strings.Contains(title, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseDurationMinutes 解析 B 站采集的时长字符串为分钟数。
+//
+// **两段是「分钟:秒」，不是「时:分」**：crawler/collect.py 的 _format_duration 把
+// 接口返回的秒数格式化成 `f"{seconds // 60}:{seconds % 60:02d}"`，所以 9003:20 表示
+// 9003 分钟。曾按「时:分」累乘（两段也 *60），把 119:59 算成 7199 分钟，
+// 导致时长门槛形同失效。三段的 "时:分:秒" 也兼容。
+// 无法解析或为空返回 0（0 不会通过阈值判定）。
+func parseDurationMinutes(text string) int {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return 0
+	}
+	parts := strings.Split(text, ":")
+	values := make([]int, 0, len(parts))
+	for _, part := range parts {
+		value, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || value < 0 {
+			return 0
+		}
+		values = append(values, value)
+	}
+	switch len(values) {
+	case 1: // "120" 视作分钟
+		return values[0]
+	case 2: // "分钟:秒"
+		return values[0]
+	case 3: // "时:分:秒"
+		return values[0]*60 + values[1]
+	default:
+		return 0
+	}
 }
 
 // ServerConfig HTTP 服务器配置

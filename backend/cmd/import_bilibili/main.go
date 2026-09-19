@@ -37,7 +37,8 @@ func main() {
 		repository.NewResourceRepository(db),
 		repository.NewCategoryRepository(db),
 		*filePath,
-		cfg.Bilibili.AllowedTypenamesOrDefault()...,
+		cfg.Bilibili.AllowedTypenamesOrDefault(),
+		cfg.ContentRules,
 	)
 
 	var result *service.CrawlImportResult

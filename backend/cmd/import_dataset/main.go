@@ -94,10 +94,14 @@ func main() {
 	}
 
 	// filePath 传空：items 已在上面解析好，不经过爬虫交接文件
+	// 白名单与内容归类规则都传空/零值：数据集条目没有 typename，
+	// 分区白名单与「长合集→course」判定都只作用于 B 站条目，对数据集不生效。
 	importer := service.NewCrawlImportService(
 		repository.NewResourceRepository(db),
 		repository.NewCategoryRepository(db),
 		"",
+		nil,
+		config.ContentRulesConfig{},
 	)
 	// 不给 SourceURLTemplate：source_url 在 LoadDataset 阶段就已确定，取不到的行
 	// 已被跳过。这里再兜底反而会拼出错误的判重键，让同一门课反复建行。

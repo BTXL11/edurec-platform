@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Shionyori/edurec-platform/backend/internal/apperror"
+	"github.com/Shionyori/edurec-platform/backend/internal/config"
 	"github.com/Shionyori/edurec-platform/backend/internal/model"
 	"github.com/Shionyori/edurec-platform/backend/internal/repository"
 )
@@ -28,19 +29,24 @@ type CrawlImportService struct {
 	// allowedTypenames 允许入库的来源分区白名单（小写，便于大小写无关比较）。
 	// 为空表示不按分区过滤；只对 metadata 里带 typename 的条目生效（即 B 站采集）。
 	allowedTypenames map[string]struct{}
+	// courseRules 长合集/系统课程的判定规则（可配置）。只作用于 B 站条目：
+	// 带 typename 的条目按规则判定 course 或 video，其余来源沿用 opts.ResourceType。
+	courseRules config.ContentRulesConfig
 }
 
 func NewCrawlImportService(
 	resources repository.ResourceRepository,
 	categories repository.CategoryRepository,
 	filePath string,
-	allowedTypenames ...string,
+	allowedTypenames []string,
+	courseRules config.ContentRulesConfig,
 ) *CrawlImportService {
 	return &CrawlImportService{
 		resources:        resources,
 		categories:       categories,
 		filePath:         filePath,
 		allowedTypenames: newTypenameSet(allowedTypenames),
+		courseRules:      courseRules.CourseRulesOrDefault(),
 	}
 }
 
@@ -87,6 +93,12 @@ func metadataString(metadata map[string]any, key string) string {
 	}
 	text, _ := value.(string)
 	return strings.TrimSpace(text)
+}
+
+// isBilibiliItem 判断条目是否来自 B 站采集：B 站的交接单元带分区名 typename，
+// 第三方数据集的条目没有这个字段。
+func isBilibiliItem(item CrawlItem) bool {
+	return metadataString(item.Metadata, "typename") != ""
 }
 
 // CrawlImportResult 导入统计
@@ -163,6 +175,9 @@ type crawlRecord struct {
 	tagsJSON     string
 	metadataJSON string
 	viewCount    uint
+	// isLongCourse 该条是否应落库为 course 而非来源默认类型。
+	// 在解析阶段判定一次（依赖原始 title 与 metadata），落库时直接用。
+	isLongCourse bool
 }
 
 // Import 读取爬虫输出文件并落库
@@ -232,7 +247,7 @@ func (s *CrawlImportService) ImportItems(
 			result.SkippedTypenames++
 			continue
 		}
-		record, ok := newCrawlRecord(item, opts.SourceURLTemplate)
+		record, ok := newCrawlRecord(item, opts.SourceURLTemplate, s.courseRules)
 		if !ok {
 			result.SkippedResources++
 			continue
@@ -282,6 +297,11 @@ func (s *CrawlImportService) ImportItems(
 		}
 
 		resource := record.toResource(categoryID, opts.ResourceType)
+		// B 站长合集/系统课程落 course（判定在解析阶段算好，见 newCrawlRecord）；
+		// 默认口径下 150 小时的全套课程与十几分钟的单集若都是 video，就无法按类型筛选。
+		if record.isLongCourse {
+			resource.Type = model.ResourceTypeCourse
+		}
 		if write {
 			if err := s.resources.Create(resource); err != nil {
 				return nil, nil, apperror.Internal(err)
@@ -336,7 +356,7 @@ func (s *CrawlImportService) resolveCategory(
 // source_url 是判重的唯一依据，因此它必须能确定下来：item 自带则用自带的，
 // 否则由来源的 URL 模板 + 身份键拼出。两者都给不出（模板缺失或身份键为空）时
 // 必须跳过——否则每次导入都会重复插入同一行。
-func newCrawlRecord(item CrawlItem, sourceURLTemplate string) (crawlRecord, bool) {
+func newCrawlRecord(item CrawlItem, sourceURLTemplate string, rules config.ContentRulesConfig) (crawlRecord, bool) {
 	title := strings.TrimSpace(item.Title)
 	category := strings.TrimSpace(item.Category)
 	if title == "" || category == "" {
@@ -379,6 +399,10 @@ func newCrawlRecord(item CrawlItem, sourceURLTemplate string) (crawlRecord, bool
 		tagsJSON:     string(tagsJSON),
 		metadataJSON: string(metadataJSON),
 		viewCount:    item.ViewCount,
+		// 「长合集→course」只作用于 B 站条目：带 typename 才算 B 站，
+		// 第三方数据集沿用 opts.ResourceType，不被标题关键词误判。
+		isLongCourse: isBilibiliItem(item) &&
+			rules.IsLongCourse(title, metadataString(item.Metadata, "duration")),
 	}, true
 }
 

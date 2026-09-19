@@ -52,6 +52,29 @@ bilibili:
   #   - 校园学习
   #   - 计算机技术
 
+# 内容归类规则：判断 B 站内容是否算「长合集/系统课程」，导入时自动落库为 course（否则 video）。
+# 判定 = （命中 course_keywords 或 collection_markers 或标题形如「全N集/N讲」）且 时长 >= course_min_minutes。
+# 时长条件不可省：B 站大量「17分钟看完XX教程」的短片标题也带「教程/全集」，只看关键词会误判。
+# 留空/不写各项 → 用代码内默认值；改这里即可调整口径，不用改代码。
+content_rules:
+  # 判定为课程的最短时长（分钟）。B 站 duration 形如 "2809:53"，即 分钟:秒
+  course_min_minutes: 120
+  # 强关键词：命中且时长达标即判为课程（子串匹配）
+  course_keywords:
+    - 课程
+    - 精讲
+  # 合集/系列标记（同样子串匹配）
+  collection_markers:
+    - 合集
+    - 全集
+    - 全套
+    - 系列
+  # 弱关键词：「教程」「讲解」在短片标题里极常见，只有在时长达到 longform_min_minutes 时才算课程
+  longform_keywords:
+    - 教程
+    - 讲解
+  longform_min_minutes: 600
+
 # 第三方数据集导入（cmd/import_dataset）。各家数据集的字段名和格式都不一样，
 # 所以对应关系全部写在下面，换数据集只改这一段，不动代码。
 # 三步走：
