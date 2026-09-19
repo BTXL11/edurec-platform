@@ -136,9 +136,9 @@ SELECT u.id, u.username, COUNT(r.id) AS rec FROM edurec.users u
 
 | 指标 | 当前值 | 备注 |
 |---|---|---|
-| resources 总数 | **199** | **全部是真实 B 站采集资源**（模拟资源已清除）；在线抓取会持续增加 |
-| 其中 `source_url like %bilibili.com%` | **199** | 全部有来源链接 |
-| 资源类型分布 | video 199 | 模拟的 course/article 已随模拟数据一并清除 |
+| resources 总数 | **205** | **全部是真实 B 站采集资源**（模拟资源已清除）；在线抓取会持续增加 |
+| 其中 `source_url like %bilibili.com%` | **205** | 全部有来源链接 |
+| 资源类型分布 | **course 43 · video 162** | 长合集已改判 course（`scripts/reclassify-long-courses.sql`）；详见 `docs/bilibili-import.md` |
 | users | **4** | `BTXL`(2) · `biliverify`(3) · `demo_admin`(2000) · `demo_fresh`(2001) |
 | recommendations（缓存行） | **3** | 属于 BTXL / biliverify / demo_admin；`demo_fresh` 无行 → 走兜底（1.8 节） |
 | user_behaviors | **42** | BTXL / biliverify 的真实行为（view/click/favorite 三类齐全） |

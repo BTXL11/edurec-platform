@@ -174,6 +174,31 @@ B 站搜索是**按关键词返回**的，不区分内容性质。搜「杨真�
 > `resources` 表当前**没有 `source_url` 唯一索引**（见「已知限制」）。导入命令是单进程串行执行的，
 > 不存在并发写入，实际不会产生重复行。
 
+## 资源类型：为什么入库全是 video，长合集怎么改判 course
+
+B 站采集**统一按 `type=video` 落库**（`BilibiliImportOptions.ResourceType`），因为 B 站搜索结果
+本身不区分「单集视频」与「系列课程」——一条搜索结果就是一个视频，即便它是 151 集的合集。
+于是 `resources` 里会出现「十几分钟的单集」和「150 小时的全套课程」类型相同、无法按类型筛选的情况。
+
+**长合计改判 course 走数据迁移，不走导入逻辑**：
+
+```bash
+mysql -h 127.0.0.1 -P 3308 -u root -p edurec < scripts/reclassify-long-courses.sql
+```
+
+判定口径（标题含 `合集/全集/全套/系列/全N集/N集/课程/教程` 且时长 ≥ 120 分钟，
+`duration` 形如 `2809:53` 即**分钟:秒**）。2026-09-19 在库上命中 **43 条**，逐条核对均为长课程/系列
+（121 分钟 ~ 150 小时），结果 `course 43 / video 162`。脚本含查看、执行与回滚三段，可反复执行。
+
+之所以不做进导入逻辑：**类型是平台侧字段**，改判属于人工/运营判断而非采集事实；
+而且判重命中时导入只刷新 `view_count` 与 `metadata`、**不覆盖 `type`**
+（`internal/service/crawl_import.go` 的 `ImportItems`），所以改判后重新导入不会被改回 video，
+也可以随时在管理后台 `/admin/resources` 逐条调整。
+
+> ⚠️ **连带影响已处理**：详情页原先用 `type === 'video'` 判断是否显示 B 站评论区，
+> 改判后这些课程会丢失评论区。判据已改为「来源是 B 站」（`source_url` 含 `bilibili.com`），
+> 因此 **course 类型的 B 站内容同样有评论区**。
+
 ## 前端展示
 
 - **封面**：卡片与详情页的 `<img>` 均带 `referrerpolicy="no-referrer"`。
