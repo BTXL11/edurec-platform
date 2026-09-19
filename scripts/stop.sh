@@ -23,30 +23,30 @@ for arg in "$@"; do
   esac
 done
 
-log() { printf '\n\033[1;36m[stop]\033[0m %s\n' "$*"; }
+log() { echo "[stop] $*"; }
 
 stop_by_pid() {
   local pidfile="$1" name="$2"
   if [ -f "$pidfile" ]; then
     local pid; pid="$(cat "$pidfile")"
     if kill "$pid" 2>/dev/null; then
-      echo "已停止 $name (pid $pid)"
+      echo "  $name: 已停止 (pid=$pid)"
     fi
     rm -f "$pidfile"
   fi
 }
 
-log "停止后端 / 前端"
+log "停止后端与前端"
 stop_by_pid "$RUN_DIR/backend.pid" "后端"
 stop_by_pid "$RUN_DIR/frontend.pid" "前端"
 # 兜底：清理可能的残留进程（go run 会派生实际 server 子进程）
-pkill -f "go run ./cmd/server" 2>/dev/null && echo "已清理残留后端进程" || true
-pkill -f "edurec-platform/frontend" 2>/dev/null && echo "已清理残留前端进程" || true
+pkill -f "go run ./cmd/server" 2>/dev/null && echo "  后端残留进程: 已清理" || true
+pkill -f "edurec-platform/frontend" 2>/dev/null && echo "  前端残留进程: 已清理" || true
 
 if [ "$WITH_DB" = 1 ]; then
   log "停止 MySQL / Redis 容器"
   docker stop edurec-mysql edurec-redis 2>/dev/null || true
-  echo "容器已停止（数据保留，下次运行 start.sh 会自动启动容器）"
+  echo "  容器已停止（数据保留，下次 start.sh 会自动复用）"
 fi
 
 log "完成"

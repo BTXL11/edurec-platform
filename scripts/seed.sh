@@ -28,32 +28,32 @@ CONFIG_PATH="${CONFIG_PATH:-configs/config.yaml}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-root}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-edurec}"
 
-log() { printf '\n\033[1;36m[seed]\033[0m %s\n' "$*"; }
-die() { printf '\033[1;31m[seed][错误]\033[0m %s\n' "$*" >&2; exit 1; }
+log() { echo "[seed] $*"; }
+die() { echo "[seed] 错误: $*" >&2; exit 1; }
 
 # ---- 前置检查 ---------------------------------------------------------------
 command -v docker >/dev/null || die "未找到 docker（需 MySQL 容器在运行）"
 command -v go >/dev/null || die "未找到 go"
 [ -d "$ENGINE_ROOT" ] || die "engine 目录不存在: $ENGINE_ROOT"
 
-# ---- ① 拷贝 sim 数据 ---------------------------------------------------------
-log "① 准备模拟数据"
+# ---- [1] 拷贝 sim 数据 ---------------------------------------------------------
+log "[1] 准备模拟数据"
 if [ ! -d "$BACKEND_DIR/data/sim" ]; then
   [ -d "$ENGINE_ROOT/dataset/sim" ] || die "engine 无模拟数据: $ENGINE_ROOT/dataset/sim（先跑 gen_sim_data）"
   cp -r "$ENGINE_ROOT/dataset/sim" "$BACKEND_DIR/data/sim"
-  echo "已从 engine 拷贝 -> backend/data/sim"
+  echo "  已从 engine 拷贝到 backend/data/sim"
 else
-  echo "backend/data/sim 已存在，跳过拷贝"
+  echo "  backend/data/sim 已存在，跳过"
 fi
 
-# ---- ② 幂等播种 --------------------------------------------------------------
-log "② 播种演示数据"
+# ---- [2] 幂等播种 --------------------------------------------------------------
+log "[2] 播种演示数据"
 USER_COUNT="$(docker exec edurec-mysql mysql -uroot -p"$MYSQL_PASSWORD" -N -e \
   "SELECT COUNT(*) FROM $MYSQL_DATABASE.users" 2>/dev/null || echo 0)"
 if [ "$USER_COUNT" = "0" ] || [ -z "$USER_COUNT" ]; then
   ( cd "$BACKEND_DIR" && CONFIG_PATH="$CONFIG_PATH" go run ./cmd/demo_seed -with-behaviors )
 else
-  echo "已有 ${USER_COUNT} 个用户，跳过播种（如需重置请手动清库）"
+  echo "  已有 ${USER_COUNT} 个用户，跳过（重置请用 clean.sh）"
 fi
 
-log "完成。演示账号：demo1 / demo123456；管理员：demo_admin / demo123456"
+log "完成，账号: demo1/demo123456（普通），demo_admin/demo123456（管理员）"

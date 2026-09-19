@@ -1,6 +1,6 @@
 # edurec-platform
 
-教育资源推荐平台（edurec-engine 的应用场景）。后端 Go + 前端 Vue3。
+教育资源推荐平台（edurec-engine 的应用场景），后端 Go + 前端 Vue3。
 
 | 子项目 | 技术栈 |
 |---|---|
@@ -10,114 +10,132 @@
 
 ## 快速开始
 
-### 一键运行（推荐）
+### 启动服务（前后端、数据库的 docker 容器）
 
-前置（仅首次）：Docker 可用；engine 依赖已装（`cd ../edurec-engine && pip install -e .[dev]`）。
-
+确保数据库容器已启动（MySQL 8 + Redis 7），然后启动前后端服务
 ```bash
-# ① 起服务（容器 → 后端 :8080 → 前端 :5173）
-bash scripts/start.sh
-
-# ② 准备数据（二选一）
-bash scripts/seed.sh        # 演示数据：播种 sim（登录账号 demo1/demo123456）
-bash scripts/bilibili.sh    # 真实数据：采集 B 站视频入库
-
-# ③ 刷新个性化推荐（导出"当前库里的数据" → engine 训练/推理 → 导入缓存表）
-bash scripts/handoff.sh
-
-# ④ 收工
-bash scripts/stop.sh            # 只停后端/前端
-bash scripts/stop.sh --with-db  # 连数据库容器一起停
-```
-
-### 手动运行
-
-```bash
-# ① 起数据库容器（需 Docker）
-docker run -d --name edurec-mysql -p 3306:3306 \
-  -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=edurec mysql:8
-docker run -d --name edurec-redis -p 6379:6379 redis:7
-
-# ② 播种演示数据（先拷 engine 模拟数据，保证 ID 对齐）
 cd backend
-cp -r ../edurec-engine/dataset/sim data/sim
-CONFIG_PATH=configs/config.yaml go run ./cmd/demo_seed -with-behaviors
-
-# ③ 起后端（另开终端，监听 :8080）
 CONFIG_PATH=configs/config.yaml go run ./cmd/server
-
-# ④ 起前端（另开终端，监听 :5173；默认 VITE_MOCK=1 走 mock，连真实后端改 VITE_MOCK=0）
-cd ../frontend && pnpm install && pnpm dev
+cd ../frontend
+pnpm install && pnpm dev
 ```
 
-### 脚本
+也可以通过脚本一键完成
+```bash
+bash scripts/start.sh
+```
+
+### 准备数据
+
+目前暂不支持导入自己准备好的资源（待实现），推荐直接从 B 站爬取资源并导入
+```bash
+cd backend/crawler
+cp config.example.yaml config.yaml            # 可以按需更改任务与目标分类
+.venv/bin/python run.py --config config.yaml  # 数据存储到 backend/data/bilibili
+```
+
+也可以通过脚本一键完成
+```bash
+bash scripts/bilibili.sh
+```
+
+### 冷启动
+
+刚起服务时，平台没有用户行为数据，推荐模型无法训练，需要先模拟一批用户和他们对现有资源的行为
+```bash
+bash scripts/mock-users.sh
+```
+
+### 训练模型并导入
+
+```bash
+# 1.导出平台数据快照
+cd backend
+CONFIG_PATH=configs/config.yaml go run ./cmd/export_snapshot   # → data/snapshots/<run_id>/
+
+# 2.快照拷给 engine（engine 与 platform 并列）
+cp -r data/snapshots/<run_id> ../../edurec-engine/dataset/platform_snapshot/<run_id>/
+
+# 3.engine 训练 + 推理
+cd ../../edurec-engine
+.venv/bin/python -m scripts.train_all --data-source platform --snapshot-dir dataset/platform_snapshot/<run_id>
+.venv/bin/python -m scripts.run_batch_infer --data-source platform --snapshot-dir dataset/platform_snapshot/<run_id>
+
+# 4.结果拷回 platform
+cp model/recommendations.json ../edurec-platform/backend/data/recommendations.json
+
+# 5.导入（需后端运行；管理员登录后 POST /api/v1/admin/recommendations/import）
+```
+
+以上操作也可以通过脚本一键完成
+```bash
+bash scripts/handoff.sh
+```
+
+## 预设方案
+
+### 从 B 站爬取资源
+
+从 B 站爬取教育视频资源并导入平台
+```bash
+bash scripts/start.sh        # 起服务
+bash scripts/bilibili.sh     # 采真实资源（B 站公开视频入库）
+bash scripts/mock-users.sh   # 解决冷启动：模拟一批用户 + 交互（复用真实资源，不引入假资源）
+bash scripts/handoff.sh      # 训练首版推荐
+```
+
+### 完全依靠模拟数据（仅测试）
+
+用户行为数据和资源数据都由模拟脚本生成，仅用于离线演示/测试
+```bash
+bash scripts/start.sh
+bash scripts/seed.sh         # 播 sim 假数据（含假资源）
+bash scripts/handoff.sh
+```
+
+## 脚本
 
 | 脚本 | 作用 |
 |---|---|
 | `scripts/start.sh` | 一键启动：容器 → 后端 → 前端（不准备数据） |
 | `scripts/stop.sh [--with-db]` | 停止服务；`--with-db` 连容器一起停 |
-| `scripts/seed.sh` | 播种 sim 演示数据（拷贝 + demo_seed，幂等） |
+| `scripts/seed.sh` | 播 sim 假数据（仅离线演示/测试，生产不用） |
 | `scripts/bilibili.sh` | B 站采集+导入（`--dry-run`/`--crawl-only`/`--import-only`） |
 | `scripts/handoff.sh [--infer-only]` | 推荐刷新：导出 → 训练 → 推理 → 导入；`--infer-only` 跳过训练 |
+| `scripts/mock-users.sh` | 生成模拟用户 + 对现有资源的行为（不引入 sim 资源） |
+| `scripts/clean.sh` | 清空数据库所有表数据（保留表结构） |
 
-## 推荐闭环（engine 离线批量训练 → 结果落库）
+## 功能模块
 
-两仓的交叉接口是 platform 的 **MySQL 数据库**——engine 与 platform 不直接调用，数据经数据库衔接：
+### 已实现
 
-- 数据下链：`export_snapshot` 将业务表（用户/资源/行为/评分）导出为快照目录 → engine 据此训练 + 全量推理
-- 结果上链：engine 产出的推荐列表（平台原始 ID）经导入接口写入 `Recommendation` 缓存表
-- 读侧：`GET /api/v1/recommendations` 读缓存表返回；未命中用户按评分降序热门兜底并写缓存（空/缺失缓存不会导致无推荐）
+| 模块 | 说明 |
+|---|---|
+| 认证 | 注册、登录、token 刷新 |
+| 用户 | 个人资料查看/更新、行为历史 |
+| 资源 | 列表（关键词/分类/类型/标签筛选、排序）、详情、录入/更新/删除（管理员） |
+| 分类 | 列表、创建（管理员） |
+| 评分 | 查看、打分 |
+| 行为 | 浏览（view）自动上报、行为历史查询 |
+| 评论 | 展示 B 站爬取的热门评论（只读） |
+| 推荐 | 个性化推荐（engine 结果导入 + 热门兜底） |
+| 管理后台 | 用户/资源/分类管理、推荐导入 |
+| B 站采集 | 离线批量采集 + 在线搜索/评论爬取 |
 
-platform 不做模型推理、engine 不做在线服务：首页是否个性化，取决于 `Recommendation` 缓存表是否被 engine 结果填充——
-已导入则返回导入列表，从未导入/新用户则走热门兜底。交接文件只是 MySQL 数据的序列化载体，
-详见 [docs/engine-integration.md](docs/engine-integration.md)。
+### 待实现
 
-```bash
-cd backend
-# （可选）播种演示数据（管理员 demo_admin/demo123456）
-CONFIG_PATH=configs/config.yaml go run ./cmd/demo_seed -with-behaviors
-# ① 导出平台数据快照 → engine 据此训练/推理（见 docs/data-handoff.md）
-CONFIG_PATH=configs/config.yaml go run ./cmd/export_snapshot   # → data/snapshots/<run_id>/
-# ② 管理员导入 engine 推荐结果 → 个性化生效（文件须先置于 data/recommendations.json）
-```
-
-engine 与平台目录隔离，交接物为数据快照与推荐结果文件，经 `backend/data/` 目录传递，详见 [docs/data-handoff.md](docs/data-handoff.md)。
-
-## 内容来源（B 站教育视频采集 → 导入）
-
-除手工录入 / `demo_seed` 外，平台还有一条独立的内容渠道：Python 采集 B 站公开视频元数据 → 输出 JSON → Go 命令导入
-`resources` 表。视频以 `type=video` 的普通资源**混入现有资源列表**，不新增专区、不改动推荐链路。
-
-一键方式：`bash scripts/bilibili.sh`（自动建 crawler venv + 采集 + 导入，等价于下面手动两步）。
-
-```bash
-# ① 采集（需 pip install -r backend/crawler/requirements.txt）
-cd backend/crawler && python run.py --config config.example.yaml
-# ② 导入（文件默认 data/bilibili/latest.json，加 -dry-run 可只统计不写库）
-cd backend && CONFIG_PATH=configs/config.yaml go run ./cmd/import_bilibili
-```
-
-按 `source_url` 判重：已存在的资源**不新增行**，只刷新播放量与 `metadata`，因此可反复执行。
-只采集公开元数据，不伪造设备指纹、不实现验证码绕过，详见 [docs/bilibili-import.md](docs/bilibili-import.md)。
+| 功能 | 现状 |
+|---|---|
+| 点击（click）上报 | 后端已支持，前端未触发 |
+| 收藏（favorite） | 后端已支持，前端无收藏按钮 |
+| 用户发表评论 | 评论接口只读（来自 B 站爬取），无发表能力 |
+| 批量导入自有资源 | 仅支持 B 站格式导入 + 管理后台单个录入 |
 
 ## 测试
 
 ```bash
 cd backend  && go test ./... && go vet ./...
 cd frontend && pnpm test && pnpm type-check && pnpm lint
-```
-
-## 功能模块
-
-认证 / 用户 / 资源 / 分类 / 评分 / 行为 / 管理后台 / 推荐（engine 结果导入 + 热门兜底）
-
-## 数据流
-
-```
-platform export_snapshot（真实数据 → data/snapshots/<run_id>/）
-→ engine 训练 + 全量推理（读该快照）
-→ 推荐结果放至 data/recommendations.json → 管理员导入
-→ Recommendation 缓存表 → GET /api/v1/recommendations → 前端首页
 ```
 
 ## 文档

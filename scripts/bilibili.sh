@@ -2,7 +2,7 @@
 # =============================================================================
 # bilibili.sh — B 站教育资源采集 + 导入 一键脚本
 #
-# 依次完成：准备 crawler 环境（幂等建 venv）→ 采集 B 站公开视频元数据 →
+# 依次完成：准备 crawler 环境（幂等建 venv）-> 采集 B 站公开视频元数据 ->
 # 导入 resources 表。与 docs/bilibili-import.md 的手动步骤一一对应。
 #
 # 用法：
@@ -28,8 +28,8 @@ CRAWL_CONFIG="${CRAWL_CONFIG:-config.yaml}"
 CONFIG_PATH="${CONFIG_PATH:-configs/config.yaml}"
 IMPORT_FILE="${IMPORT_FILE:-data/bilibili/latest.json}"
 
-log() { printf '\n\033[1;36m[bilibili]\033[0m %s\n' "$*"; }
-die() { printf '\033[1;31m[bilibili][错误]\033[0m %s\n' "$*" >&2; exit 1; }
+log() { echo "[bilibili] $*"; }
+die() { echo "[bilibili] 错误: $*" >&2; exit 1; }
 
 DRY_RUN=0; CRAWL_ONLY=0; IMPORT_ONLY=0
 for arg in "$@"; do
@@ -47,29 +47,29 @@ done
 command -v go >/dev/null || die "未找到 go"
 [ -d "$CRAWLER_DIR" ] || die "crawler 目录不存在: $CRAWLER_DIR"
 
-# ---- ① 准备 crawler venv（幂等） ---------------------------------------------
+# ---- [1] 准备 crawler venv（幂等） ---------------------------------------------
 CRAWLER_PYTHON="$CRAWLER_DIR/.venv/bin/python"
 if [ ! -x "$CRAWLER_PYTHON" ]; then
-  log "① 首次运行：创建 crawler 虚拟环境并装依赖"
+  log "[1] 初始化 crawler 虚拟环境"
   ( cd "$CRAWLER_DIR" && python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt )
 fi
 
-# ---- ② 采集 ------------------------------------------------------------------
+# ---- [2] 采集 ------------------------------------------------------------------
 if [ "$IMPORT_ONLY" = 1 ]; then
-  log "② 跳过采集（--import-only）"
+  log "[2] 跳过采集（--import-only）"
 else
-  log "② 采集 B 站数据 (config=$CRAWL_CONFIG)"
+  log "[2] 采集 B 站数据 (config=$CRAWL_CONFIG)"
   [ -f "$CRAWLER_DIR/$CRAWL_CONFIG" ] || die "采集配置不存在: $CRAWLER_DIR/$CRAWL_CONFIG（先 cp config.example.yaml config.yaml）"
   CRAWL_ARGS=(--config "$CRAWL_CONFIG")
   [ "$DRY_RUN" = 1 ] && CRAWL_ARGS+=(--dry-run)
   ( cd "$CRAWLER_DIR" && "$CRAWLER_PYTHON" run.py "${CRAWL_ARGS[@]}" )
 fi
 
-# ---- ③ 导入 ------------------------------------------------------------------
+# ---- [3] 导入 ------------------------------------------------------------------
 if [ "$CRAWL_ONLY" = 1 ]; then
-  log "③ 跳过导入（--crawl-only）"
+  log "[3] 跳过导入（--crawl-only）"
 else
-  log "③ 导入 resources 表 (file=$IMPORT_FILE)"
+  log "[3] 导入资源 (file=$IMPORT_FILE)"
   IMPORT_ARGS=(-file "$IMPORT_FILE")
   [ "$DRY_RUN" = 1 ] && IMPORT_ARGS+=(-dry-run)
   ( cd "$BACKEND_DIR" && CONFIG_PATH="$CONFIG_PATH" go run ./cmd/import_bilibili "${IMPORT_ARGS[@]}" )
