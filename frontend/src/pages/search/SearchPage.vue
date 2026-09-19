@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { listCategories } from '@/api/category'
 import { listResources } from '@/api/resource'
 import ResourceCard from '@/components/resource/ResourceCard.vue'
 import type { Category, Resource } from '@/types'
 
 const PAGE_SIZE = 12
+
+const route = useRoute()
 
 const categories = ref<Category[]>([])
 const resources = ref<Resource[]>([])
@@ -16,7 +19,14 @@ const total = ref(0)
 const hasMore = ref(true)
 const exhausted = ref(false)
 
-const keyword = ref('')
+// 支持从顶栏搜索框跳转：/search?keyword=xxx（query 可能是 string | string[] | null）
+function keywordFromQuery(): string {
+  const raw = route.query.keyword
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+const keyword = ref(keywordFromQuery())
 const categoryId = ref<number | undefined>(undefined)
 const type = ref('')
 const sort = ref<'latest' | 'popular' | 'rating'>('latest')
@@ -166,6 +176,18 @@ function resetAndSearch() {
   loadingMore.value = false
   fetchLocal()
 }
+
+// 顶栏搜索框再次提交（改写 query）时，同步关键词并重新搜索；
+// resetAndSearch 内部会自增 requestGeneration，在飞的旧请求返回后会被丢弃。
+watch(
+  () => route.query.keyword,
+  () => {
+    const kw = keywordFromQuery()
+    if (kw === keyword.value) return
+    keyword.value = kw
+    resetAndSearch()
+  },
+)
 
 function handleSearch() {
   resetAndSearch()

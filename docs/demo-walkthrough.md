@@ -356,11 +356,12 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/auth/register -Method Post `
 1. 顶部导航点「课程」（等价于直接打开 `http://localhost:5173/search`）。
 2. 在关键词框输入 **`雅思`**，回车（或点「搜索」）。
 
-> ⚠️ **别用顶栏那个搜索框（会丢关键词）**：页面顶部 header 里还有一个占位符为「搜索课程、文章、视频…」的输入框
-> （`FrontLayout.vue:26-31`），它**没有绑定 v-model**，回车只执行 `router.push({ name: 'search' })` ——
-> **你输入的关键词会被丢掉**，跳到搜索页后仍是空的，得再输一遍。
-> 演示时**只用搜索页内部那个**「输入关键词…」框（`SearchPage.vue:215`，带 `v-model`）。
-> 这是个已知的真实缺陷（**未修改代码**，因为现场不宜改动可见组件）；若老师问起，照实说「顶栏这是装饰性入口，未接参数透传，待修」。
+   > ✅ **顶栏搜索框已经修好了**（2026-09-19）：页面顶部 header 里占位符为「搜索课程、文章、视频…」的那个框，
+   > 原先**没有绑定 `v-model`**，输入的内容会被渲染清掉（表现为"打不进字"）；现在已绑定并支持回车跳转
+   > —— 跳转时会带 `?keyword=`，搜索页挂载即按该关键词搜索，且输入框会回填。
+   > 演示时**两个框都能用**；若老师问起，可以照实说「这里原先是个没接参数的占位入口，已修」。
+   > （改动见 `FrontLayout.vue` 的 `submitSearch()` 与 `SearchPage.vue` 的 `keywordFromQuery()` + `watch`。）
+
 3. 本地结果立刻耗尽 → 底部**自动**出现「正在加载…」，**不用手动滚到底**（本地 0 条时哨兵直接可见）。
 4. 观察底部文案从「正在加载…」→ 列表**追加新卡片**（这些是刚从 B 站实时抓来并落库的）。
 5. 打开 DevTools Network，找到带 `online_page=1` 的那条 `GET /api/v1/resources`。
@@ -674,13 +675,13 @@ npm test ; npm run type-check
 | `go test ./...` | **通过（exit 0）** | `middleware`/`model`/`service`/`util/jwt`/`util/refresh` 有测试；**`handler`/`repository`/`router` 三个目录当前没有测试文件** |
 | `go vet ./...` | **通过（exit 0）** | 输出里的 `error acquiring upload token ... Access is denied` 是 Go 遥测告警，与本项目无关 |
 | `npm run type-check` | **通过（exit 0）** | `vue-tsc --noEmit` |
-| `npm test` | **25 个用例全部通过**（7 个文件） | 但**退出码为 1**：vitest 的 worker fork 在本机受限环境下 `Timeout waiting for worker to respond`（19 个 worker 报错）。看输出里的 `Test Files 7 passed (7)` / `Tests 25 passed (25)` |
+| `npm test` | **111 个用例全部通过（27 个文件）** | 新增了「顶栏搜索框」等回归用例；本机一次全量约 45–50 秒（worker 冷启动较慢）。看输出里的 `Test Files 27 passed (27)` / `Tests 111 passed (111)` |
 
 说什么：「后端 Go 单测覆盖认证/推荐/CRUD 关键路径，前端 Vitest + Vue Test Utils 覆盖核心交互（决策 #21）；
 测试策略是**实用主义**——保关键路径，不追覆盖率数字（design.md 第 9 节）。」
 
-> ⚠️ **现场别踩的雷**：`npm test` **退出码是 1**，老师盯着终端会以为挂了。主动说明：
-> 25 个用例全过，退出码来自 vitest worker 的环境超时；同时**主动承认** handler/repository/router 三层目前缺测试
+> ⚠️ **现场提示**：全量 `npm test` 在本机要 45 秒以上（vitest worker 冷启动慢），现场时间紧就别跑全量，
+> 用 `npx vitest run src/pages/search` 或直接讲代码。同时**主动承认** handler/repository/router 三层目前缺测试
 > （`qa-prep.md` 与 `presentation-notes.md` 都已把这条列为待补项 —— 主动承认比被问出来得分高）。
 
 ---
