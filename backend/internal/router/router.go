@@ -27,6 +27,8 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	statsRepo := repository.NewStatsRepository(db)
 	adminRepo := repository.NewAdminRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
+	knowledgeRepo := repository.NewKnowledgeRepository(db)
+	learningRepo := repository.NewLearningRepository(db)
 	refreshTokenStore := repository.NewRedisRefreshTokenStore(rdb)
 	jwtManager := jwtutil.NewManager(cfg.JWT.AccessSecret)
 
@@ -50,8 +52,18 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	)
 	bilibiliOnlineService := service.NewBilibiliOnlineService(bilibiliImportService, cfg.Bilibili)
 	resourceService.SetBilibiliOnline(bilibiliOnlineService)
+	disciplineCrawler := service.NewDisciplineCrawlService(knowledgeRepo, bilibiliOnlineService, 30*time.Minute)
 	commentService := service.NewCommentService(commentRepo, bilibiliOnlineService, cfg.Bilibili.CommentLimit)
 	recommendationService := service.NewRecommendationService(recommendationRepo, resourceRepo, userRepo)
+	knowledgeService := service.NewKnowledgeService(knowledgeRepo)
+	disciplineService := service.NewDisciplineService(knowledgeRepo)
+	learningService := service.NewLearningService(knowledgeRepo, learningRepo)
+	// 概念生成：只通过 HTTP 调 engine 的 kg_server.py，平台不执行 Python
+	conceptRunner := service.NewHTTPConceptRunner(
+		cfg.Knowledge.GeneratorURL,
+		time.Duration(cfg.Knowledge.GeneratorTimeoutSeconds)*time.Second,
+	)
+	conceptGenerator := service.NewConceptGenerator(knowledgeRepo, conceptRunner, 10*time.Minute)
 	recommendationImportService := service.NewRecommendationImportService(
 		recommendationRepo, recommendationRunRepo, userRepo, resourceRepo, cfg.Engine.RecommendationsFile,
 	)
@@ -65,6 +77,10 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	ratingHandler := handler.NewRatingHandler(ratingService)
 	commentHandler := handler.NewCommentHandler(resourceService, commentService)
 	recommendationHandler := handler.NewRecommendationHandler(recommendationService, recommendationImportService, recommendationRunRepo, statsRepo)
+	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeService)
+	learningHandler := handler.NewLearningHandler(learningService)
+	generationHandler := handler.NewGenerationHandler(conceptGenerator, knowledgeService)
+	disciplineHandler := handler.NewDisciplineHandler(disciplineService, disciplineCrawler)
 	adminHandler := handler.NewAdminHandler(adminService)
 
 	r := gin.New()
@@ -103,6 +119,26 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	protected.POST("/resources/:id/ratings", ratingHandler.Upsert)
 	protected.GET("/resources/:id/comments", commentHandler.List)
 	protected.GET("/recommendations", recommendationHandler.Get)
+	// 知识点导航：列表 / 图谱详情 / 知识点下的资源
+	protected.GET("/knowledge-points", knowledgeHandler.List)
+	protected.GET("/knowledge-points/:code", knowledgeHandler.Detail)
+	protected.GET("/knowledge-points/:code/resources", knowledgeHandler.Resources)
+	// 学科导航：主页面学科 -> 学科页 -> 知识点/资源；无资源时自动爬取
+	protected.GET("/disciplines", disciplineHandler.List)
+	protected.GET("/disciplines/:code", disciplineHandler.Detail)
+	protected.POST("/disciplines/:code/crawl", disciplineHandler.Crawl)
+	protected.GET("/disciplines/:code/crawl", disciplineHandler.CrawlStatus)
+	// 概念生成（engine kg_server.py）：搜索栏实时触发 + 状态轮询
+	protected.POST("/knowledge-generation", generationHandler.StartByKeyword)
+	protected.POST("/knowledge-points/:code/generate", generationHandler.Start)
+	protected.GET("/knowledge-points/:code/generate", generationHandler.Status)
+	// 自适应学习：问卷 -> 知识画像 -> 先修路径 -> 逐节解锁
+	protected.GET("/learning-profile", learningHandler.Profile)
+	protected.POST("/learning-profile/questionnaire", learningHandler.SubmitQuestionnaire)
+	protected.POST("/learning-paths", learningHandler.CreatePath)
+	protected.GET("/learning-paths/:id", learningHandler.GetPath)
+	protected.POST("/learning-paths/:id/complete", learningHandler.CompleteStep)
+	protected.GET("/learning-paths/:id/resources", learningHandler.Resources)
 	protected.GET("/admin/users", middleware.AdminRequired(userRepo), adminHandler.ListUsers)
 	protected.GET("/admin/resources", middleware.AdminRequired(userRepo), adminHandler.ListResources)
 	protected.POST("/admin/recommendations/import", middleware.AdminRequired(userRepo), recommendationHandler.Import)

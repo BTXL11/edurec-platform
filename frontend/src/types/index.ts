@@ -46,6 +46,128 @@ export interface Resource {
 // 学习难度：与后端 model.Difficulty* 常量一致
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced'
 
+/** 知识点节点（学科级），与后端 service.KnowledgeNode 对齐 */
+export interface KnowledgeNode {
+  id: number
+  code: string
+  name: string
+  description: string
+  level: number
+  discipline_code: string
+  resource_count: number
+  concept_count: number
+}
+
+/** 学科（主页面入口） */
+export interface Discipline {
+  code: string
+  name: string
+  description: string
+  point_count: number
+  resource_count: number
+}
+
+/** 学科详情：学科下的知识点与资源 */
+export interface DisciplineDetail {
+  discipline: Discipline
+  points: KnowledgeNode[]
+  resources: Resource[]
+  resource_total: number
+}
+
+/** 学科资源自动爬取状态 */
+export interface DisciplineCrawlStatus {
+  discipline_code: string
+  status: 'idle' | 'running' | 'done' | 'failed'
+  imported: number
+  linked: number
+  resource_total: number
+  keyword?: string
+  error?: string
+  started_at?: string
+  finished_at?: string
+}
+
+/** 知识点先修边：from 学完才能学 to */
+export interface KnowledgeEdge {
+  from: number
+  to: number
+}
+
+/** 概念级知识点（来自 EMBEDD-ER / MOOCCube，或 engine generate.py 生成） */
+export interface KnowledgeConcept {
+  id: number
+  code: string
+  name: string
+  field: string
+  point_code: string
+  level: number
+  explanation?: string
+  /** mooc = MOOCCube 导入；generated = engine 生成 */
+  source?: string
+  page_rank?: number
+}
+
+/** engine 概念生成任务状态 */
+export interface GenerationStatus {
+  point_code: string
+  status: 'idle' | 'running' | 'done' | 'failed'
+  generated: number
+  total: number
+  error?: string
+  started_at?: string
+  finished_at?: string
+}
+
+/** 搜索栏关键词触发生成的返回 */
+export interface KeywordGenerationResult {
+  point_code: string
+  point_name: string
+  status: GenerationStatus
+}
+
+/** 知识点详情：学科图 + 概念子图 + 资源 */
+export interface KnowledgeDetail {
+  point: KnowledgeNode
+  nodes: KnowledgeNode[]
+  edges: KnowledgeEdge[]
+  resources: Resource[]
+  resource_total: number
+  concepts: KnowledgeConcept[]
+  concept_edges: KnowledgeEdge[]
+}
+
+/** 知识画像条目：某知识点的掌握度（0-1）与来源 */
+export interface LearningProfileItem {
+  point_code: string
+  name: string
+  level: number
+  mastery: number
+  source: string
+}
+
+export type PathStepStatus = 'done' | 'current' | 'locked'
+
+/** 学习路径中的一节 */
+export interface PathStep {
+  code: string
+  name: string
+  level: number
+  mastery: number
+  status: PathStepStatus
+  resource_count: number
+}
+
+/** 学习路径 */
+export interface LearningPath {
+  id: number
+  target_code: string
+  target_name: string
+  steps: PathStep[]
+  current_index: number
+  status: 'active' | 'completed'
+}
+
 export interface Rating {
   id: number
   user: Pick<User, 'id' | 'username' | 'display_name' | 'avatar_url'>

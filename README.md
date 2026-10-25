@@ -104,6 +104,8 @@ bash scripts/handoff.sh
 | `scripts/handoff.sh [--infer-only]` | 推荐刷新：导出 → 训练 → 推理 → 导入；`--infer-only` 跳过训练 |
 | `scripts/mock-users.sh` | 生成模拟用户 + 对现有资源的行为（不引入 sim 资源） |
 | `scripts/clean.sh` | 清空数据库所有表数据（保留表结构） |
+| `scripts/rebuild-kg.ps1` / `.sh` | 重建知识图谱（学科 + 概念），`-DryRun` / `-KeepOld` |
+| `scripts/set-kg-source.ps1` / `.sh` | 一键切换知识图谱数据源路径（迁 engine 用） |
 
 ## 功能模块
 
@@ -123,6 +125,10 @@ bash scripts/handoff.sh
 | 推荐运营 | 运行记录、效果看板（曝光/点击/CTR）、离线评估（vs 热门基线） |
 | 管理后台 | 用户/资源/分类管理、推荐导入与推荐管理 |
 | B 站采集 | 离线批量采集 + 在线搜索/评论爬取 |
+| 知识图谱 | 21 个学科 / 72 个知识点 + 19 条先修边，关联 380+ 资源；导入 engine 的 MOOCCube 概念图（425 概念 / 1027 边） |
+| 学科导航 | 主页面按学科组织；学科页展示知识点与资源，无资源时自动爬取 B 站 |
+| 自适应学习 | 初始问卷 → 知识画像（问卷/行为/完成度）→ 先修路径 → 逐节解锁，只推荐当前未掌握内容 |
+| 关键帧 | B 站封面 + 视频关键帧（雪碧图）采集与详情页展示 |
 
 ### 待实现
 
@@ -146,3 +152,5 @@ cd frontend && pnpm test && pnpm type-check && pnpm lint
 - [docs/engine-integration.md](docs/engine-integration.md) —— edurec-engine 接入说明（离线批量 + 结果落库）
 - [docs/data-handoff.md](docs/data-handoff.md) —— 数据交接与一轮刷新流程
 - [docs/bilibili-import.md](docs/bilibili-import.md) —— B 站教育视频采集与导入（字段映射、判重语义、合规边界）
+- [docs/adaptive-learning.md](docs/adaptive-learning.md) —— 知识图谱、初始问卷、学习画像与先修路径
+

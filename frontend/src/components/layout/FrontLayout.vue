@@ -24,6 +24,8 @@ function handleCommand(command: string) {
     router.push({ name: 'login' })
   } else if (command === 'me') {
     router.push({ name: 'user-me' })
+  } else if (command === 'questionnaire') {
+    router.push({ name: 'questionnaire' })
   }
 }
 
@@ -59,6 +61,11 @@ function submitSearch() {
             exact-active-class="text-primary font-medium"
           >首页</RouterLink>
           <RouterLink
+            :to="{ name: 'knowledge' }"
+            class="transition-colors duration-150 hover:text-primary"
+            :class="route.name?.toString().startsWith('knowledge') ? 'text-primary font-medium' : ''"
+          >知识点</RouterLink>
+          <RouterLink
             :to="{ name: 'search' }"
             class="transition-colors duration-150 hover:text-primary"
             :class="route.name === 'search' && !activeType ? 'text-primary font-medium' : ''"
@@ -91,6 +98,7 @@ function submitSearch() {
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="me">个人中心</el-dropdown-item>
+                  <el-dropdown-item command="questionnaire">学习问卷</el-dropdown-item>
                   <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>

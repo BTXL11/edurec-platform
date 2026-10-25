@@ -88,7 +88,7 @@ describe('BehaviorHistory', () => {
     mockedListMyBehaviors.mockResolvedValue(pageResult([behavior], 1))
     const wrapper = await mountHistory()
 
-    expect(wrapper.find('[data-testid="history-content"]').classes()).toContain('min-h-[34rem]')
+    expect(wrapper.find('[data-testid="history-content"]').classes()).toContain('min-h-[30rem]')
     expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(false)
     expect(wrapper.find('[data-testid="history-pagination"]').exists()).toBe(true)
   })
