@@ -80,13 +80,36 @@ func main() {
 
 	codeToID := make(map[string]uint, len(codes))
 	totalLinks := 0
-	for _, seed := range service.DefaultKnowledgePoints {
-		point := &model.KnowledgePoint{
+	// 学科层：主页面的一级入口（数学/物理/化学……），需先于知识点写入
+	disciplineCount := 0
+	for index, seed := range service.DefaultDisciplines {
+		keywords, marshalErr := json.Marshal(seed.Keywords)
+		if marshalErr != nil {
+			log.Fatalf("序列化学科 %s 关键词失败: %v", seed.Code, marshalErr)
+		}
+		discipline := &model.Discipline{
 			Code:        seed.Code,
 			Name:        seed.Name,
 			Description: seed.Description,
-			Level:       levels[seed.Code],
-			SortOrder:   len(codeToID),
+			Keywords:    string(keywords),
+			SortOrder:   index,
+		}
+		if !*dryRun {
+			if err := knowledgeRepo.UpsertDiscipline(discipline); err != nil {
+				log.Fatalf("写入学科 %s 失败: %v", seed.Code, err)
+			}
+		}
+		disciplineCount++
+	}
+
+	for _, seed := range service.DefaultKnowledgePoints {
+		point := &model.KnowledgePoint{
+			Code:           seed.Code,
+			Name:           seed.Name,
+			Description:    seed.Description,
+			Level:          levels[seed.Code],
+			SortOrder:      len(codeToID),
+			DisciplineCode: seed.DisciplineCode,
 		}
 		if !*dryRun {
 			if err := knowledgeRepo.UpsertPoint(point); err != nil {
@@ -156,8 +179,8 @@ func main() {
 	if *dryRun {
 		fmt.Printf("%s --dry-run：未写库\n", prefix)
 	}
-	fmt.Printf("%s 学科层：%d 个学科，%d 条先修，%d 条资源关联（扫描资源 %d 个）\n",
-		prefix, len(service.DefaultKnowledgePoints), edgeCount, totalLinks, len(resources))
+	fmt.Printf("%s 知识点层：%d 个知识点 / %d 个学科，%d 条先修，%d 条资源关联（扫描资源 %d 个）\n",
+		prefix, len(service.DefaultKnowledgePoints), disciplineCount, edgeCount, totalLinks, len(resources))
 
 	if *skipConcepts {
 		return

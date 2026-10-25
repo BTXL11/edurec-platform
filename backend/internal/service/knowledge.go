@@ -19,13 +19,14 @@ func NewKnowledgeService(points repository.KnowledgeRepository) *KnowledgeServic
 
 // KnowledgeNode 图谱中的一个节点
 type KnowledgeNode struct {
-	ID            uint   `json:"id"`
-	Code          string `json:"code"`
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-	Level         int    `json:"level"`
-	ResourceCount int64  `json:"resource_count"`
-	ConceptCount  int64  `json:"concept_count"`
+	ID             uint   `json:"id"`
+	Code           string `json:"code"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	Level          int    `json:"level"`
+	DisciplineCode string `json:"discipline_code"`
+	ResourceCount  int64  `json:"resource_count"`
+	ConceptCount   int64  `json:"concept_count"`
 }
 
 // KnowledgeEdge 图谱中的一条先修边：From 学完才能学 To
@@ -188,12 +189,13 @@ func (s *KnowledgeService) Resources(code string, page, pageSize int) ([]model.R
 
 func toKnowledgeNode(point *model.KnowledgePoint, count, conceptCount int64) KnowledgeNode {
 	return KnowledgeNode{
-		ID:            point.ID,
-		Code:          point.Code,
-		Name:          point.Name,
-		Description:   point.Description,
-		Level:         point.Level,
-		ResourceCount: count,
-		ConceptCount:  conceptCount,
+		ID:             point.ID,
+		Code:           point.Code,
+		Name:           point.Name,
+		Description:    point.Description,
+		Level:          point.Level,
+		DisciplineCode: point.DisciplineCode,
+		ResourceCount:  count,
+		ConceptCount:   conceptCount,
 	}
 }

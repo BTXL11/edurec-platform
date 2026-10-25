@@ -17,6 +17,15 @@ type KnowledgeRepository interface {
 	ListResourcesByPoint(pointID uint, limit, offset int) ([]model.Resource, int64, error)
 	UpsertPoint(point *model.KnowledgePoint) error
 	UpdatePointLevel(id uint, level int) error
+
+	// 学科层（主页面入口）
+	UpsertDiscipline(discipline *model.Discipline) error
+	ListDisciplines() ([]model.Discipline, error)
+	FindDisciplineByCode(code string) (*model.Discipline, error)
+	ListPointsByDiscipline(code string) ([]model.KnowledgePoint, error)
+	CountPointsByDiscipline() (map[string]int64, error)
+	CountResourcesByDiscipline() (map[string]int64, error)
+	ListResourcesByDiscipline(code string, limit, offset int) ([]model.Resource, int64, error)
 	CreateEdgeIfAbsent(edge *model.KnowledgePointEdge) error
 	UpsertResourceLink(link *model.ResourceKnowledgePoint) error
 	ListLinkedResourceIDs(pointID uint) ([]uint, error)
@@ -154,9 +163,10 @@ func (r *KnowledgeRepo) UpsertPoint(point *model.KnowledgePoint) error {
 
 	point.ID = existing.ID
 	if err := r.db.Model(&existing).Updates(map[string]any{
-		"name":        point.Name,
-		"description": point.Description,
-		"sort_order":  point.SortOrder,
+		"name":            point.Name,
+		"description":     point.Description,
+		"sort_order":      point.SortOrder,
+		"discipline_code": point.DisciplineCode,
 	}).Error; err != nil {
 		return fmt.Errorf("更新知识点失败: %w", err)
 	}
@@ -366,4 +376,130 @@ func (r *KnowledgeRepo) ResetKnowledgeGraph() error {
 		}
 		return nil
 	})
+}
+
+// ---------- 学科层 ----------
+
+// UpsertDiscipline 按 code 幂等写入学科
+func (r *KnowledgeRepo) UpsertDiscipline(discipline *model.Discipline) error {
+	var existing model.Discipline
+	err := r.db.Where("code = ?", discipline.Code).First(&existing).Error
+	switch {
+	case err == gorm.ErrRecordNotFound:
+		if err := r.db.Create(discipline).Error; err != nil {
+			return fmt.Errorf("创建学科失败: %w", err)
+		}
+		return nil
+	case err != nil:
+		return fmt.Errorf("查询学科失败: %w", err)
+	}
+
+	if err := r.db.Model(&existing).Updates(map[string]any{
+		"name":        discipline.Name,
+		"description": discipline.Description,
+		"keywords":    discipline.Keywords,
+		"sort_order":  discipline.SortOrder,
+	}).Error; err != nil {
+		return fmt.Errorf("更新学科失败: %w", err)
+	}
+	return nil
+}
+
+func (r *KnowledgeRepo) ListDisciplines() ([]model.Discipline, error) {
+	var items []model.Discipline
+	if err := r.db.Order("sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		return nil, fmt.Errorf("查询学科失败: %w", err)
+	}
+	return items, nil
+}
+
+func (r *KnowledgeRepo) FindDisciplineByCode(code string) (*model.Discipline, error) {
+	var discipline model.Discipline
+	err := r.db.Where("code = ?", code).First(&discipline).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("查询学科失败: %w", err)
+	}
+	return &discipline, nil
+}
+
+func (r *KnowledgeRepo) ListPointsByDiscipline(code string) ([]model.KnowledgePoint, error) {
+	var points []model.KnowledgePoint
+	if err := r.db.Where("discipline_code = ?", code).
+		Order("level ASC, sort_order ASC, id ASC").Find(&points).Error; err != nil {
+		return nil, fmt.Errorf("查询学科知识点失败: %w", err)
+	}
+	return points, nil
+}
+
+func (r *KnowledgeRepo) CountPointsByDiscipline() (map[string]int64, error) {
+	type row struct {
+		DisciplineCode string
+		Total          int64
+	}
+	var rows []row
+	if err := r.db.Model(&model.KnowledgePoint{}).
+		Select("discipline_code, COUNT(*) AS total").
+		Where("discipline_code <> ''").
+		Group("discipline_code").Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("统计学科知识点数失败: %w", err)
+	}
+	out := make(map[string]int64, len(rows))
+	for _, item := range rows {
+		out[item.DisciplineCode] = item.Total
+	}
+	return out, nil
+}
+
+func (r *KnowledgeRepo) CountResourcesByDiscipline() (map[string]int64, error) {
+	type row struct {
+		DisciplineCode string
+		Total          int64
+	}
+	var rows []row
+	err := r.db.Raw(`
+		SELECT p.discipline_code AS discipline_code, COUNT(DISTINCT rkp.resource_id) AS total
+		FROM resource_knowledge_points rkp
+		JOIN knowledge_points p ON p.id = rkp.point_id AND p.deleted_at IS NULL
+		JOIN resources r ON r.id = rkp.resource_id AND r.deleted_at IS NULL
+		WHERE rkp.deleted_at IS NULL AND p.discipline_code <> ''
+		GROUP BY p.discipline_code
+	`).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("统计学科资源数失败: %w", err)
+	}
+	out := make(map[string]int64, len(rows))
+	for _, item := range rows {
+		out[item.DisciplineCode] = item.Total
+	}
+	return out, nil
+}
+
+func (r *KnowledgeRepo) ListResourcesByDiscipline(code string, limit, offset int) ([]model.Resource, int64, error) {
+	var total int64
+	if err := r.db.Raw(`
+		SELECT COUNT(DISTINCT r.id)
+		FROM resources r
+		JOIN resource_knowledge_points rkp ON rkp.resource_id = r.id AND rkp.deleted_at IS NULL
+		JOIN knowledge_points p ON p.id = rkp.point_id AND p.deleted_at IS NULL
+		WHERE r.deleted_at IS NULL AND p.discipline_code = ?
+	`, code).Scan(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("统计学科资源失败: %w", err)
+	}
+
+	var items []model.Resource
+	if err := r.db.Raw(`
+		SELECT DISTINCT r.*
+		FROM resources r
+		JOIN resource_knowledge_points rkp ON rkp.resource_id = r.id AND rkp.deleted_at IS NULL
+		JOIN knowledge_points p ON p.id = rkp.point_id AND p.deleted_at IS NULL
+		WHERE r.deleted_at IS NULL AND p.discipline_code = ?
+		ORDER BY r.avg_rating DESC, r.id DESC
+		LIMIT ? OFFSET ?
+	`, code, limit, offset).Scan(&items).Error; err != nil {
+		return nil, 0, fmt.Errorf("查询学科资源失败: %w", err)
+	}
+	return items, total, nil
 }

@@ -52,9 +52,11 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	)
 	bilibiliOnlineService := service.NewBilibiliOnlineService(bilibiliImportService, cfg.Bilibili)
 	resourceService.SetBilibiliOnline(bilibiliOnlineService)
+	disciplineCrawler := service.NewDisciplineCrawlService(knowledgeRepo, bilibiliOnlineService, 30*time.Minute)
 	commentService := service.NewCommentService(commentRepo, bilibiliOnlineService, cfg.Bilibili.CommentLimit)
 	recommendationService := service.NewRecommendationService(recommendationRepo, resourceRepo, userRepo)
 	knowledgeService := service.NewKnowledgeService(knowledgeRepo)
+	disciplineService := service.NewDisciplineService(knowledgeRepo)
 	learningService := service.NewLearningService(knowledgeRepo, learningRepo)
 	// 概念生成：只通过 HTTP 调 engine 的 kg_server.py，平台不执行 Python
 	conceptRunner := service.NewHTTPConceptRunner(
@@ -78,6 +80,7 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeService)
 	learningHandler := handler.NewLearningHandler(learningService)
 	generationHandler := handler.NewGenerationHandler(conceptGenerator, knowledgeService)
+	disciplineHandler := handler.NewDisciplineHandler(disciplineService, disciplineCrawler)
 	adminHandler := handler.NewAdminHandler(adminService)
 
 	r := gin.New()
@@ -120,6 +123,11 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	protected.GET("/knowledge-points", knowledgeHandler.List)
 	protected.GET("/knowledge-points/:code", knowledgeHandler.Detail)
 	protected.GET("/knowledge-points/:code/resources", knowledgeHandler.Resources)
+	// 学科导航：主页面学科 -> 学科页 -> 知识点/资源；无资源时自动爬取
+	protected.GET("/disciplines", disciplineHandler.List)
+	protected.GET("/disciplines/:code", disciplineHandler.Detail)
+	protected.POST("/disciplines/:code/crawl", disciplineHandler.Crawl)
+	protected.GET("/disciplines/:code/crawl", disciplineHandler.CrawlStatus)
 	// 概念生成（engine kg_server.py）：搜索栏实时触发 + 状态轮询
 	protected.POST("/knowledge-generation", generationHandler.StartByKeyword)
 	protected.POST("/knowledge-points/:code/generate", generationHandler.Start)

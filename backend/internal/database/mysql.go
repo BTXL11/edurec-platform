@@ -59,5 +59,6 @@ func autoMigrate(db *gorm.DB) error {
 		&model.LearnerProfile{},
 		&model.QuestionnaireResponse{},
 		&model.LearningPath{},
+		&model.Discipline{},
 	)
 }

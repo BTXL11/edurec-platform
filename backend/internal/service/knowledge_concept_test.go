@@ -22,7 +22,7 @@ func TestMatchSubjectCode(t *testing.T) {
 		{"深度学习基础（2020秋）", "deep-learning"},
 		{"数据结构与算法（自主模式）", "data-structures"},
 		{"雅思写作单项班", "ielts"},
-		{"大学英语（自主模式）", ""},
+		{"大学英语（自主模式）", "college-english"},
 		{"", ""},
 	}
 

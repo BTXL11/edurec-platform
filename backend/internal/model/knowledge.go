@@ -8,11 +8,12 @@ import "gorm.io/gorm"
 // Level 表示在有向无环图里的层级（1 = 无先修），由先修边推导后写入，便于列表与图谱分层展示。
 type KnowledgePoint struct {
 	gorm.Model
-	Code        string `gorm:"uniqueIndex;size:64;not null" json:"code"`
-	Name        string `gorm:"size:128;not null;index" json:"name"`
-	Description string `gorm:"type:text" json:"description"`
-	Level       int    `gorm:"default:1;index" json:"level"`
-	SortOrder   int    `gorm:"default:0" json:"sort_order"`
+	Code           string `gorm:"uniqueIndex;size:64;not null" json:"code"`
+	Name           string `gorm:"size:128;not null;index" json:"name"`
+	Description    string `gorm:"type:text" json:"description"`
+	Level          int    `gorm:"default:1;index" json:"level"`
+	SortOrder      int    `gorm:"default:0" json:"sort_order"`
+	DisciplineCode string `gorm:"size:64;index" json:"discipline_code"`
 }
 
 // KnowledgePointEdge 知识点先修关系：From 是 To 的先修（From 学完才能学 To）。
