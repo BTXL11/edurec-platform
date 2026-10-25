@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =============================================================================
-# set-kg-source.sh — 一键切换知识图谱数据源路径（EMBEDD-ER / MOOCCube）
+# set-kg-source.sh — 一键切换知识图谱数据源路径（engine / MOOCCube）
 #
 # 修改 backend/configs/config.local.yaml 里的 knowledge.source_dir，
 # 首次修改前保留 .bak 备份。迁入 engine 仓库后重新指向新目录即可，无需改代码。
 #
 # 用法：
 #   bash scripts/set-kg-source.sh --show
-#   bash scripts/set-kg-source.sh ../../EMBEDD-ER/data/MOOCCube
+#   bash scripts/set-kg-source.sh ../../edurec-engine/model/data/MOOCCube
 #   bash scripts/set-kg-source.sh /opt/engine/data/MOOCCube backend/configs/config.yaml
 #
 # 数据目录应包含 relations/prerequisite-dependency.json 等 MOOCCube 文件。
@@ -87,3 +87,4 @@ mv "$TMP_FILE" "$CONFIG_PATH"
 echo "已更新 knowledge.source_dir -> $PATH_VALUE"
 echo "配置文件: $CONFIG_PATH"
 echo "下一步: (cd backend && CONFIG_PATH=configs/config.local.yaml go run ./cmd/seed_knowledge -dry-run)"
+

@@ -37,9 +37,10 @@
   （标题 1.0、标签 0.6、描述 0.3，阈值 0.5），当前 380+ 条。
 - 层级由先修边拓扑推导，**有环直接报错**（知识点层必须严格无环）。
 
-### 概念层（EMBEDD-ER / MOOCCube + generate.py）
+### 概念层（engine / MOOCCube + generate.py）
 
-- 数据来源：`E:\work\learn\EMBEDD-ER\data\MOOCCube`（外部仓库，不入库）。
+- 数据来源：`E:\work\learn\edurec-engine\model\data\MOOCCube`（engine 仓库的 model/，不入库；
+  代码在 `src/kg/`）。
 - 规模：425 个概念、1027 条先修边（数学 + 计算机科学技术）。
 - 概念没有学科标签，导入时通过「课程 → 概念」反推：
   课程名按学科关键词归类 → 概念按所属课程投票 → 票数最多的学科即归属。
@@ -53,7 +54,7 @@
 
 ```yaml
 knowledge:
-  source_dir: "E:/work/learn/EMBEDD-ER/data/MOOCCube"
+  source_dir: "E:/work/learn/edurec-engine/model/data/MOOCCube"
 ```
 
 迁入 engine 仓库后只改这一处路径，**不改代码**：
@@ -147,11 +148,11 @@ knowledge:
 
 ## 6. 实时概念生成（engine 侧）
 
-概念不再只靠离线导入：engine 提供 `kg_server.py`，平台在搜索时实时调用。
+概念不再只靠离线导入：engine 提供 `scripts/kg_server.py`，平台在搜索时实时调用。
 
 ```powershell
-cd E:\work\learn\EMBEDD-ER
-.\.venv\Scripts\python.exe kg_server.py --host 127.0.0.1 --port 8090
+cd E:\work\learn\edurec-engine
+python scripts/kg_server.py --host 127.0.0.1 --port 8090
 ```
 
 engine 接口（标准库 HTTP，无额外依赖）：

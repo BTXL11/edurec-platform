@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  一键切换知识图谱数据源路径（EMBEDD-ER / MOOCCube）。
+  一键切换知识图谱数据源路径（engine / MOOCCube）。
 
 .DESCRIPTION
   修改 backend/configs/<Config> 里 knowledge.source_dir 的值，并在首次修改前保留 .bak 备份。
@@ -15,7 +15,7 @@
     entities/course.json
 
 .PARAMETER Path
-  新的 MOOCCube 数据目录。建议相对 backend/ 运行目录（如 ../../EMBEDD-ER/data/MOOCCube），
+  新的 MOOCCube 数据目录。建议相对 backend/ 运行目录（如 ../../edurec-engine/model/data/MOOCCube），
   也可以给绝对路径。
 
 .PARAMETER Config
@@ -141,3 +141,4 @@ Set-Content -Path $Config -Value $newLines -Encoding UTF8
 Write-Output "已更新 knowledge.source_dir -> $value"
 Write-Output "配置文件: $Config"
 Write-Output "下一步: cd backend; CONFIG_PATH=configs/config.local.yaml go run ./cmd/seed_knowledge -dry-run"
+

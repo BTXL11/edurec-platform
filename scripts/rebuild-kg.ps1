@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  一键重建知识图谱（学科层 + EMBEDD-ER 概念层）。
+  一键重建知识图谱（学科层 + engine 概念层）。
 
 .DESCRIPTION
   默认先清空上一版图谱派生数据再重建（-KeepOld 可保留旧数据做增量）。
@@ -64,3 +64,4 @@ try {
 }
 
 Write-Output "[rebuild-kg] 完成。查看接口: GET /api/v1/knowledge-points"
+

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# rebuild-kg.sh — 一键重建知识图谱（学科层 + EMBEDD-ER 概念层）
+# rebuild-kg.sh — 一键重建知识图谱（学科层 + engine 概念层）
 #
 # 默认先清空上一版图谱派生数据再重建（--keep-old 保留旧数据做增量）。
 # 只清理知识图谱相关表，资源/用户/行为/评分不受影响。
@@ -56,3 +56,4 @@ echo "[rebuild-kg] go ${args[*]}"
 cd "$BACKEND_DIR"
 CONFIG_PATH="$CONFIG_PATH" go "${args[@]}"
 echo "[rebuild-kg] 完成。查看接口: GET /api/v1/knowledge-points"
+
