@@ -28,6 +28,7 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	adminRepo := repository.NewAdminRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
 	knowledgeRepo := repository.NewKnowledgeRepository(db)
+	learningRepo := repository.NewLearningRepository(db)
 	refreshTokenStore := repository.NewRedisRefreshTokenStore(rdb)
 	jwtManager := jwtutil.NewManager(cfg.JWT.AccessSecret)
 
@@ -54,6 +55,7 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	commentService := service.NewCommentService(commentRepo, bilibiliOnlineService, cfg.Bilibili.CommentLimit)
 	recommendationService := service.NewRecommendationService(recommendationRepo, resourceRepo, userRepo)
 	knowledgeService := service.NewKnowledgeService(knowledgeRepo)
+	learningService := service.NewLearningService(knowledgeRepo, learningRepo)
 	recommendationImportService := service.NewRecommendationImportService(
 		recommendationRepo, recommendationRunRepo, userRepo, resourceRepo, cfg.Engine.RecommendationsFile,
 	)
@@ -68,6 +70,7 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	commentHandler := handler.NewCommentHandler(resourceService, commentService)
 	recommendationHandler := handler.NewRecommendationHandler(recommendationService, recommendationImportService, recommendationRunRepo, statsRepo)
 	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeService)
+	learningHandler := handler.NewLearningHandler(learningService)
 	adminHandler := handler.NewAdminHandler(adminService)
 
 	r := gin.New()
@@ -110,6 +113,13 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	protected.GET("/knowledge-points", knowledgeHandler.List)
 	protected.GET("/knowledge-points/:code", knowledgeHandler.Detail)
 	protected.GET("/knowledge-points/:code/resources", knowledgeHandler.Resources)
+	// 自适应学习：问卷 -> 知识画像 -> 先修路径 -> 逐节解锁
+	protected.GET("/learning-profile", learningHandler.Profile)
+	protected.POST("/learning-profile/questionnaire", learningHandler.SubmitQuestionnaire)
+	protected.POST("/learning-paths", learningHandler.CreatePath)
+	protected.GET("/learning-paths/:id", learningHandler.GetPath)
+	protected.POST("/learning-paths/:id/complete", learningHandler.CompleteStep)
+	protected.GET("/learning-paths/:id/resources", learningHandler.Resources)
 	protected.GET("/admin/users", middleware.AdminRequired(userRepo), adminHandler.ListUsers)
 	protected.GET("/admin/resources", middleware.AdminRequired(userRepo), adminHandler.ListResources)
 	protected.POST("/admin/recommendations/import", middleware.AdminRequired(userRepo), recommendationHandler.Import)

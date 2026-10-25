@@ -56,5 +56,8 @@ func autoMigrate(db *gorm.DB) error {
 		&model.ResourceKnowledgePoint{},
 		&model.KnowledgeConcept{},
 		&model.KnowledgeConceptEdge{},
+		&model.LearnerProfile{},
+		&model.QuestionnaireResponse{},
+		&model.LearningPath{},
 	)
 }
