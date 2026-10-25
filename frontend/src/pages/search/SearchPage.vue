@@ -3,9 +3,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { listCategories } from '@/api/category'
 import { listResources } from '@/api/resource'
+import { startGenerationByKeyword, getConceptGenerationStatus } from '@/api/knowledge'
 import ResourceCard from '@/components/resource/ResourceCard.vue'
 import ResourceCardSkeleton from '@/components/resource/ResourceCardSkeleton.vue'
-import type { Category, Resource } from '@/types'
+import type { Category, GenerationStatus, Resource } from '@/types'
 
 const PAGE_SIZE = 12
 
@@ -42,6 +43,64 @@ const tags = ref('')
 
 const page = ref(1)
 const onlinePage = ref(1)
+
+// 搜索即构建：关键词命中知识点时，后台调用 engine 生成概念，前端轮询状态。
+// 失败（无匹配 / engine 未启动）静默忽略，绝不阻塞搜索结果。
+const generation = ref<{
+  pointCode: string
+  pointName: string
+  status: GenerationStatus
+} | null>(null)
+let generationTimer: ReturnType<typeof setInterval> | null = null
+let generationToken = 0
+
+function stopGenerationPolling() {
+  if (generationTimer) {
+    clearInterval(generationTimer)
+    generationTimer = null
+  }
+}
+
+async function triggerGeneration(rawKeyword: string) {
+  stopGenerationPolling()
+  const token = ++generationToken
+  generation.value = null
+  const kw = rawKeyword.trim()
+  if (!kw) return
+
+  try {
+    const result = await startGenerationByKeyword(kw)
+    if (token !== generationToken) return
+    generation.value = {
+      pointCode: result.point_code,
+      pointName: result.point_name,
+      status: result.status,
+    }
+    if (result.status.status === 'running') {
+      pollGeneration(result.point_code, token)
+    }
+  } catch {
+    // 没有匹配的知识点或 engine 未启动：保持静默
+  }
+}
+
+function pollGeneration(pointCode: string, token: number) {
+  stopGenerationPolling()
+  generationTimer = setInterval(async () => {
+    if (token !== generationToken) {
+      stopGenerationPolling()
+      return
+    }
+    try {
+      const status = await getConceptGenerationStatus(pointCode)
+      if (token !== generationToken) return
+      if (generation.value) generation.value.status = status
+      if (status.status !== 'running') stopGenerationPolling()
+    } catch {
+      stopGenerationPolling()
+    }
+  }, 2000)
+}
 
 const TYPE_LABELS: Record<string, string> = { course: '课程', article: '文章', video: '视频' }
 // 标题跟随顶栏导航的类型，明确当前在看哪一类
@@ -187,6 +246,8 @@ function resetAndSearch() {
   exhausted.value = false
   loadingMore.value = false
   fetchLocal()
+  // 输入即构建：每次重置搜索都尝试为关键词匹配知识点并生成概念
+  triggerGeneration(keyword.value)
 }
 
 // 顶栏搜索框再次提交（改写 query）时，同步关键词并重新搜索；
@@ -244,10 +305,14 @@ onMounted(async () => {
   }
   fetchLocal()
   setupObserver()
+  // 首次进入（含从顶栏带 keyword 跳转）也要触发生成，不能只在重置搜索时触发
+  triggerGeneration(keyword.value)
 })
 
 onBeforeUnmount(() => {
   observer?.disconnect()
+  stopGenerationPolling()
+  generationToken += 1
 })
 </script>
 
@@ -255,6 +320,32 @@ onBeforeUnmount(() => {
   <div class="mx-auto max-w-7xl px-6 py-8">
     <h1 class="text-2xl font-bold">{{ pageTitle }}</h1>
     <p class="mt-2 text-sm text-ink-secondary">搜索并筛选全部课程、文章与视频</p>
+
+    <div
+      v-if="generation"
+      class="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm"
+    >
+      <template v-if="generation.status.status === 'running'">
+        <span class="text-ink-secondary">
+          正在为「{{ generation.pointName }}」自动构建概念图谱…
+        </span>
+      </template>
+      <template v-else-if="generation.status.status === 'done'">
+        <span class="text-ink-secondary">
+          已为「{{ generation.pointName }}」补充 {{ generation.status.generated }} 个概念（共
+          {{ generation.status.total }} 个）。
+        </span>
+        <RouterLink
+          :to="{ name: 'knowledge-detail', params: { code: generation.pointCode } }"
+          class="text-primary hover:underline"
+        >查看知识点 →</RouterLink>
+      </template>
+      <template v-else-if="generation.status.status === 'failed'">
+        <span class="text-red-500">
+          概念生成失败：{{ generation.status.error || 'engine 未启动' }}（搜索不受影响）
+        </span>
+      </template>
+    </div>
 
     <div class="mt-6 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-4">
       <el-input v-model="keyword" placeholder="输入关键词…" clearable class="w-56" @keyup.enter="handleSearch" />

@@ -121,17 +121,53 @@ knowledge:
 | 学习路径 | `/learning-path/:id` | 进度、步骤状态、当前节资源、完成解锁 |
 
 图谱视图用纯 SVG + `layoutKnowledgeGraph` 纯函数实现（按 level 分列、同层居中），
-不引入图形库。
+不引入图形库。详情页默认只画**当前目标的先修闭包**，保证最右端只有这一个学习目标；
+右上角「显示全部学科」可切换到整张图。
 
-## 6. 关键帧与封面
+## 6. 实时概念生成（engine 侧）
+
+概念不再只靠离线导入：engine 提供 `kg_server.py`，平台在搜索时实时调用。
+
+```powershell
+cd E:\work\learn\EMBEDD-ER
+.\.venv\Scripts\python.exe kg_server.py --host 127.0.0.1 --port 8090
+```
+
+engine 接口（标准库 HTTP，无额外依赖）：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/health` | 服务状态 |
+| POST | `/knowledge/generate` | `{title, description, point_code}` → `{concepts:[{name, page_rank}]}` |
+| POST | `/knowledge/generate_batch` | 批量生成 |
+
+平台配置 `knowledge.generator_url`（默认 `http://127.0.0.1:8090`），**只通过 HTTP 调用，
+不执行 Python**；生成算法、Wikifier 调用、venv 依赖都留在 engine。
+
+- **搜索即构建**：搜索栏输入关键词 → `POST /knowledge-generation` 匹配最近的知识点并异步生成；
+  前端每 2s 轮询 `GET /knowledge-points/:code/generate`，完成后显示「补充 N 个概念 · 查看知识点」。
+- **详情页重新生成**：知识点详情「重新生成概念」走同一套接口。
+- **批量重建全部学科**：
+
+```powershell
+cd backend
+CONFIG_PATH=configs/config.local.yaml go run ./cmd/generate_concepts -all
+```
+
+- **去重**：同一学科同一概念名只更新 pageRank；新概念 `source=generated`，
+  MOOCCube 导入的概念保持 `source=mooc`。
+- **质量**：engine 侧按 pageRank 阈值 + 停用词过滤；带描述生成明显更好
+  （数学分析 → 积分 / 导数 / 极限 / 连续函数）。
+
+## 7. 关键帧与封面
 
 资源详情页还展示 B 站关键帧（雪碧图 CSS 裁切），详见
 [bilibili-import.md](bilibili-import.md#关键帧与封面资源特征)。
 
-## 7. 已知限制
+## 8. 已知限制
 
-- 概念层只覆盖 MOOCCube 有课程名的学科；数学分析、高等代数、泛函分析等暂无概念，
-  页面会明确提示。
+- 离线概念层只覆盖少量学科；现已用 generate.py 补齐，但概念质量受 Wikifier 影响，
+  仍会出现少量泛词（如「数学」「学习」），后续可在 engine 过滤规则里继续加强。
 - 行为侧掌握度是简单线性估计（0.1/次，上限 0.6），后续可换成引擎侧的掌握度模型。
 - 学习路径尚未合并进首页推荐流；首页仍走 engine 推荐，路径当前节资源在路径页展示。
 - 概念归属依赖课程名关键词，课程名缺失时该概念不归属任何学科。

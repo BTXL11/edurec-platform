@@ -5,13 +5,20 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import type { Category, Resource } from '@/types'
 import { listCategories } from '@/api/category'
 import { listResources } from '@/api/resource'
+import { startGenerationByKeyword, getConceptGenerationStatus } from '@/api/knowledge'
 import SearchPage from '../SearchPage.vue'
 
 vi.mock('@/api/category', () => ({ listCategories: vi.fn() }))
 vi.mock('@/api/resource', () => ({ listResources: vi.fn() }))
+vi.mock('@/api/knowledge', () => ({
+  startGenerationByKeyword: vi.fn(),
+  getConceptGenerationStatus: vi.fn(),
+}))
 
 const mockedListCategories = vi.mocked(listCategories)
 const mockedListResources = vi.mocked(listResources)
+const mockedStartGeneration = vi.mocked(startGenerationByKeyword)
+const mockedGenerationStatus = vi.mocked(getConceptGenerationStatus)
 
 type ObserverCallback = (entries: IntersectionObserverEntry[], observer: IntersectionObserver) => void
 
@@ -107,6 +114,22 @@ describe('SearchPage', () => {
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
     mockedListCategories.mockResolvedValue(categories)
     mockedListResources.mockResolvedValue(pageResult())
+    mockedStartGeneration.mockRejectedValue(new Error('没有匹配的知识点'))
+  })
+
+  it('搜索命中知识点时展示自动构建结果', async () => {
+    mockedStartGeneration.mockResolvedValue({
+      point_code: 'mathematical-analysis',
+      point_name: '数学分析',
+      status: { point_code: 'mathematical-analysis', status: 'done', generated: 11, total: 11 },
+    })
+
+    const wrapper = await mountPage({ keyword: '数学分析' })
+
+    expect(mockedStartGeneration).toHaveBeenCalledWith('数学分析')
+    expect(wrapper.text()).toContain('已为「数学分析」补充 11 个概念')
+    expect(wrapper.text()).toContain('查看知识点')
+    expect(mockedGenerationStatus).not.toHaveBeenCalled()
   })
 
   it('加载分类并拉取默认资源列表', async () => {

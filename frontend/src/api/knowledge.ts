@@ -1,5 +1,12 @@
-import { get } from './client'
-import type { KnowledgeDetail, KnowledgeNode, Page, Resource } from '@/types'
+import { get, post } from './client'
+import type {
+  GenerationStatus,
+  KeywordGenerationResult,
+  KnowledgeDetail,
+  KnowledgeNode,
+  Page,
+  Resource,
+} from '@/types'
 
 /** 知识点（学科级）列表 */
 export function listKnowledgePoints() {
@@ -19,4 +26,19 @@ export function listKnowledgeResources(code: string, page = 1, pageSize = 12) {
     `/knowledge-points/${encodeURIComponent(code)}/resources`,
     { params: { page, page_size: pageSize } },
   )
+}
+
+/** 触发某个学科的概念生成（调用 engine，异步执行） */
+export function startConceptGeneration(code: string) {
+  return post<GenerationStatus>(`/knowledge-points/${encodeURIComponent(code)}/generate`)
+}
+
+/** 查询概念生成状态 */
+export function getConceptGenerationStatus(code: string) {
+  return get<GenerationStatus>(`/knowledge-points/${encodeURIComponent(code)}/generate`)
+}
+
+/** 搜索栏关键词触发：后端匹配最近的知识点并开始生成 */
+export function startGenerationByKeyword(keyword: string) {
+  return post<KeywordGenerationResult>('/knowledge-generation', { keyword })
 }

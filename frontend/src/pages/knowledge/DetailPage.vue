@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getKnowledgePoint } from '@/api/knowledge'
+import { getKnowledgePoint, startConceptGeneration, getConceptGenerationStatus } from '@/api/knowledge'
 import { createLearningPath } from '@/api/learning'
 import ResourceCard from '@/components/resource/ResourceCard.vue'
 import KnowledgeGraph from '@/components/knowledge/KnowledgeGraph.vue'
@@ -16,12 +16,49 @@ const detail = ref<KnowledgeDetail | null>(null)
 const loading = ref(true)
 const error = ref('')
 const creatingPath = ref(false)
+const regenerating = ref(false)
+const generationNotice = ref('')
+// 默认只显示「当前目标」的先修子图：目标必须是唯一末端；
+// 打开后展示全部学科（含旁支），用于浏览整张图。
+const showAllNodes = ref(false)
 
 const VISIBLE_CONCEPTS = 30
 const visibleConcepts = computed(() => (detail.value?.concepts ?? []).slice(0, VISIBLE_CONCEPTS))
 const hiddenConceptCount = computed(() =>
   Math.max(0, (detail.value?.concepts.length ?? 0) - visibleConcepts.value.length),
 )
+
+// 目标导向子图：从当前知识点沿先修边反向取闭包，只保留「先修 → 目标」的节点。
+// 这样图的最右端（末端）只有当前这一个学习目标，而不是整张图里的多个同级学科。
+const goalGraph = computed(() => {
+  const allNodes = detail.value?.nodes ?? []
+  const allEdges = detail.value?.edges ?? []
+  const targetId = detail.value?.point.id
+  if (showAllNodes.value || !targetId) {
+    return { nodes: allNodes, edges: allEdges }
+  }
+
+  const prereqs = new Map<number, number[]>()
+  for (const edge of allEdges) {
+    const list = prereqs.get(edge.to) ?? []
+    list.push(edge.from)
+    prereqs.set(edge.to, list)
+  }
+
+  const closure = new Set<number>()
+  const stack = [targetId]
+  while (stack.length > 0) {
+    const current = stack.pop()!
+    if (closure.has(current)) continue
+    closure.add(current)
+    for (const parent of prereqs.get(current) ?? []) stack.push(parent)
+  }
+
+  return {
+    nodes: allNodes.filter((node) => closure.has(node.id)),
+    edges: allEdges.filter((edge) => closure.has(edge.from) && closure.has(edge.to)),
+  }
+})
 
 async function load() {
   if (!code.value) return
@@ -52,6 +89,33 @@ async function startLearningPath() {
     ElMessage.error(e instanceof Error ? e.message : '生成学习路径失败')
   } finally {
     creatingPath.value = false
+  }
+}
+
+// 重新生成概念：调用 engine（平台只发 HTTP），轮询到完成后刷新详情
+async function regenerateConcepts() {
+  if (!detail.value) return
+  const pointCode = detail.value.point.code
+  regenerating.value = true
+  generationNotice.value = ''
+  try {
+    let status = await startConceptGeneration(pointCode)
+    let attempts = 0
+    while (status.status === 'running' && attempts < 60) {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      status = await getConceptGenerationStatus(pointCode)
+      attempts += 1
+    }
+    if (status.status === 'done') {
+      generationNotice.value = `已生成 ${status.generated} 个概念（共 ${status.total} 个）`
+      await load()
+    } else if (status.status === 'failed') {
+      generationNotice.value = `生成失败：${status.error || 'engine 未启动'}`
+    }
+  } catch (e) {
+    generationNotice.value = e instanceof Error ? e.message : '生成失败'
+  } finally {
+    regenerating.value = false
   }
 }
 
@@ -96,26 +160,35 @@ watch(code, load)
       </header>
 
       <section class="mt-8 rounded-lg border border-border bg-surface p-5">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-base font-semibold text-ink">先修关系</h2>
-          <span class="text-xs text-ink-muted">箭头表示「先学 → 后学」，点击节点可切换</span>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-ink-muted">箭头表示「先学 → 后学」，点击节点可切换</span>
+            <el-switch v-model="showAllNodes" size="small" active-text="显示全部学科" />
+          </div>
         </div>
         <KnowledgeGraph
           class="mt-4"
-          :nodes="detail.nodes"
-          :edges="detail.edges"
+          :nodes="goalGraph.nodes"
+          :edges="goalGraph.edges"
           :current-id="detail.point.id"
           @select="openNode"
         />
       </section>
 
       <section class="mt-6 rounded-lg border border-border bg-surface p-5">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-base font-semibold text-ink">概念图谱</h2>
-          <span class="text-xs text-ink-muted">
-            来自 EMBEDD-ER / MOOCCube{{ detail.concepts.length ? ` · 共 ${detail.concepts.length} 个概念` : '' }}
-          </span>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-ink-muted">
+              来自 EMBEDD-ER{{ detail.concepts.length ? ` · 共 ${detail.concepts.length} 个概念` : '' }}
+            </span>
+            <el-button size="small" round :loading="regenerating" @click="regenerateConcepts">
+              重新生成概念
+            </el-button>
+          </div>
         </div>
+        <p v-if="generationNotice" class="mt-2 text-xs text-primary">{{ generationNotice }}</p>
 
         <template v-if="visibleConcepts.length > 0">
           <div class="mt-4 flex flex-wrap gap-2">
@@ -125,9 +198,11 @@ watch(code, load)
               :content="concept.explanation || `${concept.name}（${concept.field}）`"
               placement="top"
             >
-              <el-tag type="info" effect="plain">
+              <el-tag :type="concept.source === 'generated' ? 'success' : 'info'" effect="plain">
                 {{ concept.name }}
-                <span class="ml-1 text-[11px] text-ink-muted">L{{ concept.level }}</span>
+                <span class="ml-1 text-[11px] text-ink-muted">
+                  {{ concept.source === 'generated' ? '生成' : `L${concept.level}` }}
+                </span>
               </el-tag>
             </el-tooltip>
           </div>

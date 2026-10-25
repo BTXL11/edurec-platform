@@ -63,7 +63,7 @@ export interface KnowledgeEdge {
   to: number
 }
 
-/** 概念级知识点（来自 EMBEDD-ER / MOOCCube） */
+/** 概念级知识点（来自 EMBEDD-ER / MOOCCube，或 engine generate.py 生成） */
 export interface KnowledgeConcept {
   id: number
   code: string
@@ -72,6 +72,27 @@ export interface KnowledgeConcept {
   point_code: string
   level: number
   explanation?: string
+  /** mooc = MOOCCube 导入；generated = engine 生成 */
+  source?: string
+  page_rank?: number
+}
+
+/** engine 概念生成任务状态 */
+export interface GenerationStatus {
+  point_code: string
+  status: 'idle' | 'running' | 'done' | 'failed'
+  generated: number
+  total: number
+  error?: string
+  started_at?: string
+  finished_at?: string
+}
+
+/** 搜索栏关键词触发生成的返回 */
+export interface KeywordGenerationResult {
+  point_code: string
+  point_name: string
+  status: GenerationStatus
 }
 
 /** 知识点详情：学科图 + 概念子图 + 资源 */

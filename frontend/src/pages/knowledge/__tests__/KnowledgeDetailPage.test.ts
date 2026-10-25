@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import type { KnowledgeDetail, Resource } from '@/types'
-import { getKnowledgePoint } from '@/api/knowledge'
+import { getKnowledgePoint, startConceptGeneration, getConceptGenerationStatus } from '@/api/knowledge'
 import { createLearningPath } from '@/api/learning'
 import KnowledgeDetailPage from '../DetailPage.vue'
 
@@ -17,10 +17,16 @@ vi.mock('vue-router', async () => {
     RouterLink: { template: '<a><slot /></a>' },
   }
 })
-vi.mock('@/api/knowledge', () => ({ getKnowledgePoint: vi.fn() }))
+vi.mock('@/api/knowledge', () => ({
+  getKnowledgePoint: vi.fn(),
+  startConceptGeneration: vi.fn(),
+  getConceptGenerationStatus: vi.fn(),
+}))
 vi.mock('@/api/learning', () => ({ createLearningPath: vi.fn() }))
 
 const mockedDetail = vi.mocked(getKnowledgePoint)
+const mockedStartGeneration = vi.mocked(startConceptGeneration)
+const mockedGenerationStatus = vi.mocked(getConceptGenerationStatus)
 const mockedCreatePath = vi.mocked(createLearningPath)
 
 const resource: Resource = {
@@ -39,6 +45,7 @@ const detail: KnowledgeDetail = {
   nodes: [
     { id: 1, code: 'calculus', name: '高等数学', description: '', level: 1, resource_count: 43, concept_count: 91 },
     { id: 2, code: 'mathematical-analysis', name: '数学分析', description: '', level: 2, resource_count: 26, concept_count: 0 },
+    { id: 3, code: 'linear-algebra', name: '线性代数', description: '', level: 1, resource_count: 15, concept_count: 19 },
   ],
   edges: [{ from: 1, to: 2 }],
   resources: [resource],
@@ -112,5 +119,39 @@ describe('KnowledgeDetailPage', () => {
 
     expect(mockedCreatePath).toHaveBeenCalledWith('mathematical-analysis')
     expect(pushMock).toHaveBeenCalledWith({ name: 'learning-path', params: { id: 7 } })
+  })
+
+  it('默认只展示目标先修子图，旁支学科不出现；可切换显示全部', async () => {
+    const wrapper = await mountPage()
+
+    expect(wrapper.text()).toContain('高等数学')
+    expect(wrapper.text()).toContain('数学分析')
+    // 线性代数与数学分析无先修关系，默认不进入目标子图
+    expect(wrapper.text()).not.toContain('线性代数')
+
+    await wrapper.find('.el-switch').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('线性代数')
+  })
+
+  it('点击「重新生成概念」调用 engine 并刷新详情', async () => {
+    mockedStartGeneration.mockResolvedValue({
+      point_code: 'mathematical-analysis',
+      status: 'done',
+      generated: 11,
+      total: 11,
+    })
+
+    const wrapper = await mountPage()
+    const button = wrapper.findAll('button').find((item) => item.text().includes('重新生成概念'))
+    expect(button).toBeTruthy()
+    await button!.trigger('click')
+    await flushPromises()
+
+    expect(mockedStartGeneration).toHaveBeenCalledWith('mathematical-analysis')
+    expect(wrapper.text()).toContain('已生成 11 个概念')
+    // 完成后重新拉取详情
+    expect(mockedDetail).toHaveBeenCalledTimes(2)
+    expect(mockedGenerationStatus).not.toHaveBeenCalled()
   })
 })
