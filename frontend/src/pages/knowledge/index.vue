@@ -69,12 +69,17 @@ onMounted(load)
           按学科组织学习内容：先看先修关系，再进入每个知识点查看课程资源。
         </p>
       </div>
-      <el-input
-        v-model="keyword"
-        placeholder="搜索知识点，如 线性代数、机器学习…"
-        clearable
-        class="w-72"
-      />
+      <div class="flex items-center gap-2">
+        <RouterLink :to="{ name: 'questionnaire' }">
+          <el-button round>学习问卷</el-button>
+        </RouterLink>
+        <el-input
+          v-model="keyword"
+          placeholder="搜索知识点，如 线性代数、机器学习…"
+          clearable
+          class="w-72"
+        />
+      </div>
     </div>
 
     <div v-if="loading" class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">

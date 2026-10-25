@@ -85,6 +85,37 @@ export interface KnowledgeDetail {
   concept_edges: KnowledgeEdge[]
 }
 
+/** 知识画像条目：某知识点的掌握度（0-1）与来源 */
+export interface LearningProfileItem {
+  point_code: string
+  name: string
+  level: number
+  mastery: number
+  source: string
+}
+
+export type PathStepStatus = 'done' | 'current' | 'locked'
+
+/** 学习路径中的一节 */
+export interface PathStep {
+  code: string
+  name: string
+  level: number
+  mastery: number
+  status: PathStepStatus
+  resource_count: number
+}
+
+/** 学习路径 */
+export interface LearningPath {
+  id: number
+  target_code: string
+  target_name: string
+  steps: PathStep[]
+  current_index: number
+  status: 'active' | 'completed'
+}
+
 export interface Rating {
   id: number
   user: Pick<User, 'id' | 'username' | 'display_name' | 'avatar_url'>

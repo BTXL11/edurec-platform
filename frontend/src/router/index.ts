@@ -10,6 +10,8 @@ import ResourceDetailPage from '@/pages/resource/ResourceDetailPage.vue'
 import SearchPage from '@/pages/search/SearchPage.vue'
 import KnowledgeListPage from '@/pages/knowledge/index.vue'
 import KnowledgeDetailPage from '@/pages/knowledge/DetailPage.vue'
+import QuestionnairePage from '@/pages/questionnaire/index.vue'
+import LearningPathPage from '@/pages/learning-path/DetailPage.vue'
 import ProfilePage from '@/pages/user/ProfilePage.vue'
 import UploadPage from '@/pages/upload/UploadPage.vue'
 import AdminDashboard from '@/pages/admin/AdminDashboard.vue'
@@ -31,6 +33,13 @@ const routes = [
         path: 'knowledge/:code',
         name: 'knowledge-detail',
         component: KnowledgeDetailPage,
+        meta: { requiresAuth: true },
+      },
+      { path: 'questionnaire', name: 'questionnaire', component: QuestionnairePage, meta: { requiresAuth: true } },
+      {
+        path: 'learning-path/:id',
+        name: 'learning-path',
+        component: LearningPathPage,
         meta: { requiresAuth: true },
       },
       { path: 'resources/:id', name: 'resource-detail', component: ResourceDetailPage, meta: { requiresAuth: true } },

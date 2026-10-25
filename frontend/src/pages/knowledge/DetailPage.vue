@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { getKnowledgePoint } from '@/api/knowledge'
+import { createLearningPath } from '@/api/learning'
 import ResourceCard from '@/components/resource/ResourceCard.vue'
 import KnowledgeGraph from '@/components/knowledge/KnowledgeGraph.vue'
 import type { KnowledgeDetail, KnowledgeNode } from '@/types'
@@ -13,6 +15,7 @@ const code = computed(() => String(route.params.code ?? ''))
 const detail = ref<KnowledgeDetail | null>(null)
 const loading = ref(true)
 const error = ref('')
+const creatingPath = ref(false)
 
 const VISIBLE_CONCEPTS = 30
 const visibleConcepts = computed(() => (detail.value?.concepts ?? []).slice(0, VISIBLE_CONCEPTS))
@@ -37,6 +40,19 @@ async function load() {
 function openNode(node: KnowledgeNode) {
   if (node.code === code.value) return
   router.push({ name: 'knowledge-detail', params: { code: node.code } })
+}
+
+async function startLearningPath() {
+  if (!detail.value) return
+  creatingPath.value = true
+  try {
+    const path = await createLearningPath(detail.value.point.code)
+    router.push({ name: 'learning-path', params: { id: path.id } })
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '生成学习路径失败')
+  } finally {
+    creatingPath.value = false
+  }
 }
 
 onMounted(load)
@@ -66,6 +82,17 @@ watch(code, load)
         <p class="mt-2 max-w-3xl text-sm leading-relaxed text-ink-secondary">
           {{ detail.point.description || '暂无描述' }}
         </p>
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <el-button type="primary" round :loading="creatingPath" @click="startLearningPath">
+            生成我的学习路径
+          </el-button>
+          <RouterLink :to="{ name: 'questionnaire' }">
+            <el-button round>调整学习问卷</el-button>
+          </RouterLink>
+          <span class="text-xs text-ink-muted">
+            路径会按先修关系跳过你已掌握的内容，学完一节才解锁下一节
+          </span>
+        </div>
       </header>
 
       <section class="mt-8 rounded-lg border border-border bg-surface p-5">

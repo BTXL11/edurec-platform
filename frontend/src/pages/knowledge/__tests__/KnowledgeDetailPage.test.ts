@@ -3,21 +3,25 @@ import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import type { KnowledgeDetail, Resource } from '@/types'
 import { getKnowledgePoint } from '@/api/knowledge'
+import { createLearningPath } from '@/api/learning'
 import KnowledgeDetailPage from '../DetailPage.vue'
 
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }))
 vi.mock('vue-router', async () => {
   const { reactive } = await import('vue')
   const route = reactive({ params: { code: 'mathematical-analysis' } })
   return {
     route,
     useRoute: () => route,
-    useRouter: () => ({ push: vi.fn() }),
+    useRouter: () => ({ push: pushMock }),
     RouterLink: { template: '<a><slot /></a>' },
   }
 })
 vi.mock('@/api/knowledge', () => ({ getKnowledgePoint: vi.fn() }))
+vi.mock('@/api/learning', () => ({ createLearningPath: vi.fn() }))
 
 const mockedDetail = vi.mocked(getKnowledgePoint)
+const mockedCreatePath = vi.mocked(createLearningPath)
 
 const resource: Resource = {
   id: 63, title: '高等数学全程教学', description: '宋浩老师', cover_url: null,
@@ -88,5 +92,25 @@ describe('KnowledgeDetailPage', () => {
     expect(wrapper.text()).toContain('级数')
     expect(wrapper.text()).toContain('共 2 个概念')
     expect(wrapper.text()).toContain('概念先修边 1 条')
+  })
+
+  it('点击「生成我的学习路径」调用接口并跳转路径页', async () => {
+    mockedCreatePath.mockResolvedValue({
+      id: 7,
+      target_code: 'mathematical-analysis',
+      target_name: '数学分析',
+      steps: [],
+      current_index: 0,
+      status: 'active',
+    } as unknown as Awaited<ReturnType<typeof createLearningPath>>)
+
+    const wrapper = await mountPage()
+    const button = wrapper.findAll('button').find((item) => item.text().includes('生成我的学习路径'))
+    expect(button).toBeTruthy()
+    await button!.trigger('click')
+    await flushPromises()
+
+    expect(mockedCreatePath).toHaveBeenCalledWith('mathematical-analysis')
+    expect(pushMock).toHaveBeenCalledWith({ name: 'learning-path', params: { id: 7 } })
   })
 })
