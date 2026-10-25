@@ -39,6 +39,7 @@ RISK_CONTROL_CODES = {-352, -412}
 NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
 SEARCH_URL = "https://api.bilibili.com/x/web-interface/wbi/search/type"
 VIEW_URL = "https://api.bilibili.com/x/web-interface/view"
+VIDEOSHOT_URL = "https://api.bilibili.com/x/player/videoshot"
 SPACE_URL = "https://api.bilibili.com/x/space/wbi/arc/search"
 REPLY_URL = "https://api.bilibili.com/x/v2/reply/main"
 
@@ -213,6 +214,15 @@ class BiliClient:
     def video_detail(self, bvid: str) -> dict:
         """按 BV 号取视频详情。该接口无需登录、无需签名。"""
         body = self._request(VIEW_URL, {"bvid": bvid})
+        return body.get("data") or {}
+
+    def video_shots(self, bvid: str) -> dict:
+        """取视频关键帧雪碧图（进度条预览图）。
+
+        返回 data 里含 image（雪碧图 URL 列表）、img_x_len/img_y_len（网格列行数）、
+        img_x_size/img_y_size（单帧像素尺寸）。无需登录，未登录也可取到。
+        """
+        body = self._request(VIDEOSHOT_URL, {"bvid": bvid})
         return body.get("data") or {}
 
     def get_comments(self, bvid: str, limit: int = 20) -> list[dict]:

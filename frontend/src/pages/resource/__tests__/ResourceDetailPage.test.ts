@@ -71,8 +71,26 @@ describe('ResourceDetailPage', () => {
     expect(mockedListRatings).toHaveBeenCalledWith(1, { page: 1, page_size: 10 })
   })
 
-  it('点击收藏按钮上报 favorite 行为并切换为已收藏', async () => {
+  it('metadata 带关键帧时展示关键帧区块，且元信息表不重复渲染 frames', async () => {
+    mockedGetResource.mockResolvedValue({
+      ...resource,
+      source_url: 'https://www.bilibili.com/video/BV1DgxCzREbM',
+      metadata: {
+        duration: '12 小时',
+        frames: { sprites: ['https://bimp.hdslb.com/videoshot/1-0001.jpg'], x_len: 10, y_len: 10, count: 100 },
+      },
+    })
+
     const wrapper = await mountPage()
+
+    expect(wrapper.text()).toContain('关键帧')
+    expect(wrapper.findAll('div[title^="关键帧："]').length).toBeGreaterThan(0)
+    const metaBlock = wrapper.find('dl')
+    expect(metaBlock.text()).toContain('duration')
+    expect(metaBlock.text()).not.toContain('frames')
+  })
+
+  it('点击收藏按钮上报 favorite 行为并切换为已收藏', async () => {    const wrapper = await mountPage()
 
     const favBtn = wrapper.findAll('button').find((b) => b.text() === '收藏')
     expect(favBtn).toBeTruthy()

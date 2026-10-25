@@ -158,6 +158,42 @@ def normalize_view_item(raw: dict, category: str, tags: list[str] | None = None)
     return item
 
 
+def normalize_videoshot(data: dict, bvid: str) -> dict:
+    """关键帧雪碧图接口 /x/player/videoshot 的 data → 平台侧 frames 结构。
+
+    B 站把关键帧拼成若干张雪碧图（image），每张按 img_x_len × img_y_len 网格排布，
+    单帧尺寸为 img_x_size × img_y_size。平台只存 URL 与网格参数，前端按 CSS 裁切展示，
+    不下载、不转存图片。
+
+    返回：
+        {"bvid", "sprites": [...], "x_len", "y_len", "x_size", "y_size",
+         "count", "source"}
+    """
+    sprites = [_normalize_cover(url) for url in (data.get("image") or []) if url]
+    x_len = _to_int(data.get("img_x_len")) or 10
+    y_len = _to_int(data.get("img_y_len")) or 10
+    x_size = _to_int(data.get("img_x_size")) or 480
+    y_size = _to_int(data.get("img_y_size")) or 270
+    return {
+        "bvid": bvid,
+        "sprites": sprites,
+        "x_len": x_len,
+        "y_len": y_len,
+        "x_size": x_size,
+        "y_size": y_size,
+        "count": len(sprites) * x_len * y_len if sprites else 0,
+        "source": "bilibili.videoshot",
+    }
+
+
+def attach_frames(item: dict, shots: dict) -> dict:
+    """把关键帧挂到条目上。封面缺失时用详情接口的 pic 补齐。"""
+    frames = normalize_videoshot(shots, item["bvid"])
+    if frames["sprites"]:
+        item["frames"] = frames
+    return item
+
+
 def normalize_comment(raw: dict) -> dict | None:
     """评论接口 /x/v2/reply/main 的单条回复 → 评论 dict。
 

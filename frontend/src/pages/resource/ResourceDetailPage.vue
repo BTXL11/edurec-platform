@@ -12,6 +12,7 @@ import type { BilibiliComment, Rating, Resource } from '@/types'
 import RatingForm from '@/components/resource/RatingForm.vue'
 import RatingList from '@/components/resource/RatingList.vue'
 import CommentList from '@/components/resource/CommentList.vue'
+import KeyframeStrip, { type VideoFrames } from '@/components/resource/KeyframeStrip.vue'
 
 const PAGE_SIZE = 10
 
@@ -49,6 +50,30 @@ let prefilled = false
 const isBilibiliResource = computed(
   () => !!resource.value?.source_url?.includes('bilibili.com'),
 )
+
+// B 站关键帧（雪碧图 + 网格参数）：fetch_frames 会写进 metadata.frames
+const frames = computed<VideoFrames | null>(() => {
+  const raw = resource.value?.metadata?.frames
+  if (!raw || typeof raw !== 'object') return null
+  const candidate = raw as Partial<VideoFrames>
+  if (!Array.isArray(candidate.sprites) || candidate.sprites.length === 0) return null
+  return {
+    bvid: candidate.bvid,
+    sprites: candidate.sprites,
+    x_len: candidate.x_len || 10,
+    y_len: candidate.y_len || 10,
+    x_size: candidate.x_size,
+    y_size: candidate.y_size,
+    count: candidate.count,
+    source: candidate.source,
+  }
+})
+
+// 关键帧由独立区块展示，元信息表里不再重复渲染 frames
+const metaEntries = computed(() => {
+  const metadata = resource.value?.metadata ?? {}
+  return Object.entries(metadata).filter(([key]) => key !== 'frames')
+})
 
 async function loadResource() {
   resourceLoading.value = true
@@ -242,15 +267,17 @@ onMounted(() => {
             <p class="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-secondary">{{ resource.description }}</p>
           </div>
 
-          <div v-if="Object.keys(resource.metadata).length > 0" class="mt-4 rounded-lg border border-border bg-surface p-5">
+          <div v-if="metaEntries.length > 0" class="mt-4 rounded-lg border border-border bg-surface p-5">
             <h2 class="text-base font-semibold text-ink">元信息</h2>
             <dl class="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-              <div v-for="(value, key) in resource.metadata" :key="key">
+              <div v-for="([key, value]) in metaEntries" :key="key">
                 <dt class="text-ink-muted">{{ key }}</dt>
                 <dd class="text-ink">{{ formatMetadataValue(key, value) }}</dd>
               </div>
             </dl>
           </div>
+
+          <KeyframeStrip v-if="frames" :frames="frames" />
 
           <div class="mt-4 flex gap-3">
             <el-button v-if="resource.source_url" type="primary" round @click="openSource">前往原站学习</el-button>

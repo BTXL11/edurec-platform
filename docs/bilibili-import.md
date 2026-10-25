@@ -78,6 +78,50 @@ CONFIG_PATH=configs/config.yaml go run ./cmd/import_bilibili            # 落库
 }
 ```
 
+## 关键帧与封面（资源特征）
+
+除标题、标签、分区外，资源还补充 **封面 + 视频关键帧**，用于预览内容节奏，也为后续图谱/推荐提供视觉特征。
+
+- **数据来源**：B 站公开接口 `/x/player/videoshot`（进度条预览雪碧图），**不下载视频、不转存图片**；
+  封面取 `/x/web-interface/view` 的 `pic`（采集时已有的 `cover_url` 也保留）。
+- **存储结构**（`resources.metadata.frames`）：
+
+```json
+{
+  "frames": {
+    "bvid": "BV1DgxCzREbM",
+    "sprites": ["https://bimp.hdslb.com/videoshotpvhdboss/xxx-0001.jpg", "..."],
+    "x_len": 10, "y_len": 10,
+    "x_size": 480, "y_size": 270,
+    "count": 200,
+    "source": "bilibili.videoshot"
+  }
+}
+```
+
+  一张雪碧图按 `x_len × y_len` 网格排布，单帧 `x_size × y_size`；前端用 CSS
+  `background-size`/`background-position` 裁切，**每张雪碧图只加载一次**。
+
+- **两种补齐方式**：
+
+```bash
+# ① 采集时顺带抓取（每条多一次请求，较慢）
+cd backend/crawler
+python run.py --config config.example.yaml --with-frames [--frames-limit 50]
+
+# ② 为已入库资源批量补齐（可反复执行，默认跳过已有 frames）
+cd backend
+CONFIG_PATH=configs/config.local.yaml go run ./cmd/fetch_frames [-limit 50] [-force] [-dry-run]
+```
+
+  单条调试：`cd backend/crawler && python frames.py --bvid BV1DgxCzREbM`（stdout 一行 JSON）。
+
+- **前端展示**：详情页「关键帧」区块（`KeyframeStrip.vue`）横向展示前 8 帧；
+  元信息表会跳过 `frames` 键，避免把结构体当普通字段渲染。
+
+> 关键帧接口无需登录；遇到风控（-352/-412）时脚本按失败处理、不重试轰炸。
+> 视频过短或未生成预览图时 `sprites` 为空，命令会计入「无关键帧」而不写库，便于下次重试。
+
 ## 导入命令
 
 ```bash

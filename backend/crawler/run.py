@@ -28,7 +28,7 @@ from pathlib import Path
 import yaml
 
 from bili_client import BiliClient, BiliError, RiskControlError
-from collect import Collector
+from collect import Collector, attach_frames as attach_item_frames
 
 # backend/crawler/run.py → backend/data/bilibili
 DEFAULT_OUT_DIR = Path(__file__).resolve().parent.parent / "data" / "bilibili"
@@ -64,6 +64,17 @@ def parse_args() -> argparse.Namespace:
         "--quiet",
         action="store_true",
         help="不打印过程日志",
+    )
+    parser.add_argument(
+        "--with-frames",
+        action="store_true",
+        help="同时采集每个视频的关键帧雪碧图（每条多一次请求，较慢）",
+    )
+    parser.add_argument(
+        "--frames-limit",
+        type=int,
+        default=0,
+        help="最多为多少条采集关键帧，0 表示全部（与 --with-frames 搭配）",
     )
     return parser.parse_args()
 
@@ -116,6 +127,28 @@ def make_console_safe() -> None:
             stream.reconfigure(errors="replace")
 
 
+def attach_frames(client: BiliClient, items: list[dict], limit: int, verbose: bool) -> list[dict]:
+    """为条目采集关键帧；单条失败不阻断整批（记录后继续）。
+
+    limit<=0 表示全部。B 站关键帧接口未登录可用，但每条多一次请求，
+    大批量采集时建议配合 --frames-limit 控制耗时。
+    """
+    targets = items if limit <= 0 else items[:limit]
+    ok = 0
+    for index, item in enumerate(targets, start=1):
+        try:
+            shots = client.video_shots(item["bvid"])
+            attach_item_frames(item, shots)
+            if (item.get("frames") or {}).get("sprites"):
+                ok += 1
+            if verbose and index % 10 == 0:
+                print(f"  [frames] {index}/{len(targets)}，已获取 {ok} 条", flush=True)
+        except (BiliError, RiskControlError) as exc:
+            print(f"  [frames] {item['bvid']} 失败：{exc}", file=sys.stderr)
+    print(f"[crawler] 关键帧：{ok}/{len(targets)} 条获取成功")
+    return items
+
+
 def main() -> int:
     make_console_safe()
     args = parse_args()
@@ -138,6 +171,8 @@ def main() -> int:
     try:
         client.bootstrap()
         items = Collector(client, config, verbose=verbose).run()
+        if args.with_frames and items:
+            items = attach_frames(client, items, args.frames_limit, verbose)
     except RiskControlError as exc:
         print(f"\n[crawler] 被 B 站风控拦截：{exc.message}", file=sys.stderr)
         print("[crawler] 建议：降低频率、稍后重试，或对 UP 主任务提供 --cookie", file=sys.stderr)
