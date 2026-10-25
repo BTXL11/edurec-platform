@@ -83,6 +83,10 @@ content_rules:
 # 路径相对 backend/ 运行目录解析。
 knowledge:
   source_dir: "../../EMBEDD-ER/data/MOOCCube"
+  # 知识生成服务（engine 侧 kg_server.py）：平台只通过 HTTP 调用，不直接跑 Python。
+  # 启动：cd EMBEDD-ER && .venv\Scripts\python.exe kg_server.py --port 8090
+  generator_url: "http://127.0.0.1:8090"
+  generator_timeout_seconds: 180
 
 # 第三方数据集导入（cmd/import_dataset）。各家数据集的字段名和格式都不一样，
 # 所以对应关系全部写在下面，换数据集只改这一段，不动代码。

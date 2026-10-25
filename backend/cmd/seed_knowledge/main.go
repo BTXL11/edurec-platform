@@ -251,6 +251,7 @@ func importConcepts(sourceDir string, repo *repository.KnowledgeRepo, dryRun boo
 			PointCode:   pointCode,
 			Level:       levels[code],
 			Explanation: explanations[code],
+			Source:      "mooc",
 		}
 		if dryRun {
 			continue

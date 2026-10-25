@@ -56,6 +56,12 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	recommendationService := service.NewRecommendationService(recommendationRepo, resourceRepo, userRepo)
 	knowledgeService := service.NewKnowledgeService(knowledgeRepo)
 	learningService := service.NewLearningService(knowledgeRepo, learningRepo)
+	// 概念生成：只通过 HTTP 调 engine 的 kg_server.py，平台不执行 Python
+	conceptRunner := service.NewHTTPConceptRunner(
+		cfg.Knowledge.GeneratorURL,
+		time.Duration(cfg.Knowledge.GeneratorTimeoutSeconds)*time.Second,
+	)
+	conceptGenerator := service.NewConceptGenerator(knowledgeRepo, conceptRunner, 10*time.Minute)
 	recommendationImportService := service.NewRecommendationImportService(
 		recommendationRepo, recommendationRunRepo, userRepo, resourceRepo, cfg.Engine.RecommendationsFile,
 	)
@@ -71,6 +77,7 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	recommendationHandler := handler.NewRecommendationHandler(recommendationService, recommendationImportService, recommendationRunRepo, statsRepo)
 	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeService)
 	learningHandler := handler.NewLearningHandler(learningService)
+	generationHandler := handler.NewGenerationHandler(conceptGenerator, knowledgeService)
 	adminHandler := handler.NewAdminHandler(adminService)
 
 	r := gin.New()
@@ -113,6 +120,10 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	protected.GET("/knowledge-points", knowledgeHandler.List)
 	protected.GET("/knowledge-points/:code", knowledgeHandler.Detail)
 	protected.GET("/knowledge-points/:code/resources", knowledgeHandler.Resources)
+	// 概念生成（engine kg_server.py）：搜索栏实时触发 + 状态轮询
+	protected.POST("/knowledge-generation", generationHandler.StartByKeyword)
+	protected.POST("/knowledge-points/:code/generate", generationHandler.Start)
+	protected.GET("/knowledge-points/:code/generate", generationHandler.Status)
 	// 自适应学习：问卷 -> 知识画像 -> 先修路径 -> 逐节解锁
 	protected.GET("/learning-profile", learningHandler.Profile)
 	protected.POST("/learning-profile/questionnaire", learningHandler.SubmitQuestionnaire)

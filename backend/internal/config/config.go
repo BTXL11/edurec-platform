@@ -25,13 +25,18 @@ type Config struct {
 	Datasets     map[string]DatasetConfig `mapstructure:"datasets"`
 }
 
-// KnowledgeConfig 知识图谱数据源（EMBEDD-ER / MOOCCube）。
+// KnowledgeConfig 知识图谱数据源与生成服务。
 //
 // SourceDir 是临时路径：当前指向相邻的 EMBEDD-ER 仓库；后续项目迁入 engine 后，
 // 只需改这一处配置或设置环境变量 KNOWLEDGE_SOURCE_DIR，
 // 也可以用 scripts/set-kg-source.ps1 一键切换，不必改代码。
+//
+// GeneratorURL 指向 engine 侧 kg_server.py（标题/描述 -> 概念）。
+// 平台不直接执行 Python：生成能力留在 engine，平台只通过 HTTP 调用并把结果落库。
 type KnowledgeConfig struct {
-	SourceDir string `mapstructure:"source_dir"`
+	SourceDir               string `mapstructure:"source_dir"`
+	GeneratorURL            string `mapstructure:"generator_url"`
+	GeneratorTimeoutSeconds int    `mapstructure:"generator_timeout_seconds"`
 }
 
 // 数据集字段映射支持的内部字段名。出现词表外的 key 一律报错：
@@ -423,6 +428,13 @@ func Load(configPath string) (*Config, error) {
 	// 知识图谱数据源允许用环境变量覆盖，便于后续迁入 engine 时只改环境、不动配置
 	if dir := strings.TrimSpace(os.Getenv("KNOWLEDGE_SOURCE_DIR")); dir != "" {
 		cfg.Knowledge.SourceDir = dir
+	}
+	// 知识生成服务默认指向本地 engine（kg_server.py）
+	if strings.TrimSpace(cfg.Knowledge.GeneratorURL) == "" {
+		cfg.Knowledge.GeneratorURL = "http://127.0.0.1:8090"
+	}
+	if cfg.Knowledge.GeneratorTimeoutSeconds <= 0 {
+		cfg.Knowledge.GeneratorTimeoutSeconds = 180
 	}
 
 	if err := cfg.validateDatasets(); err != nil {

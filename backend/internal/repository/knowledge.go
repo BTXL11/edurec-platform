@@ -21,9 +21,10 @@ type KnowledgeRepository interface {
 	UpsertResourceLink(link *model.ResourceKnowledgePoint) error
 	ListLinkedResourceIDs(pointID uint) ([]uint, error)
 
-	// 概念层（EMBEDD-ER / MOOCCube）
+	// 概念层（EMBEDD-ER / MOOCCube + generate.py 生成）
 	UpsertConcept(concept *model.KnowledgeConcept) error
 	FindConceptByCode(code string) (*model.KnowledgeConcept, error)
+	FindConceptByNamePoint(name, pointCode string) (*model.KnowledgeConcept, error)
 	UpdateConceptLevel(id uint, level int) error
 	UpsertConceptEdge(edge *model.KnowledgeConceptEdge) error
 	ListConceptsByPoint(pointCode string, limit int) ([]model.KnowledgeConcept, error)
@@ -240,10 +241,25 @@ func (r *KnowledgeRepo) UpsertConcept(concept *model.KnowledgeConcept) error {
 		"field":       concept.Field,
 		"point_code":  concept.PointCode,
 		"explanation": concept.Explanation,
+		"source":      concept.Source,
+		"page_rank":   concept.PageRank,
 	}).Error; err != nil {
 		return fmt.Errorf("更新概念失败: %w", err)
 	}
 	return nil
+}
+
+// FindConceptByNamePoint 按「学科 + 概念名」查重，生成概念时避免与 MOOCCube 已有概念重复
+func (r *KnowledgeRepo) FindConceptByNamePoint(name, pointCode string) (*model.KnowledgeConcept, error) {
+	var concept model.KnowledgeConcept
+	err := r.db.Where("name = ? AND point_code = ?", name, pointCode).First(&concept).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("查询概念失败: %w", err)
+	}
+	return &concept, nil
 }
 
 func (r *KnowledgeRepo) FindConceptByCode(code string) (*model.KnowledgeConcept, error) {
