@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"slices"
 	"strconv"
@@ -20,7 +21,17 @@ type Config struct {
 	Engine       EngineConfig             `mapstructure:"engine"`
 	Bilibili     BilibiliConfig           `mapstructure:"bilibili"`
 	ContentRules ContentRulesConfig       `mapstructure:"content_rules"`
+	Knowledge    KnowledgeConfig          `mapstructure:"knowledge"`
 	Datasets     map[string]DatasetConfig `mapstructure:"datasets"`
+}
+
+// KnowledgeConfig 知识图谱数据源（EMBEDD-ER / MOOCCube）。
+//
+// SourceDir 是临时路径：当前指向相邻的 EMBEDD-ER 仓库；后续项目迁入 engine 后，
+// 只需改这一处配置或设置环境变量 KNOWLEDGE_SOURCE_DIR，
+// 也可以用 scripts/set-kg-source.ps1 一键切换，不必改代码。
+type KnowledgeConfig struct {
+	SourceDir string `mapstructure:"source_dir"`
 }
 
 // 数据集字段映射支持的内部字段名。出现词表外的 key 一律报错：
@@ -407,6 +418,11 @@ func Load(configPath string) (*Config, error) {
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("解析配置失败: %w", err)
+	}
+
+	// 知识图谱数据源允许用环境变量覆盖，便于后续迁入 engine 时只改环境、不动配置
+	if dir := strings.TrimSpace(os.Getenv("KNOWLEDGE_SOURCE_DIR")); dir != "" {
+		cfg.Knowledge.SourceDir = dir
 	}
 
 	if err := cfg.validateDatasets(); err != nil {

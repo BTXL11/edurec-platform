@@ -27,6 +27,7 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	statsRepo := repository.NewStatsRepository(db)
 	adminRepo := repository.NewAdminRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
+	knowledgeRepo := repository.NewKnowledgeRepository(db)
 	refreshTokenStore := repository.NewRedisRefreshTokenStore(rdb)
 	jwtManager := jwtutil.NewManager(cfg.JWT.AccessSecret)
 
@@ -52,6 +53,7 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	resourceService.SetBilibiliOnline(bilibiliOnlineService)
 	commentService := service.NewCommentService(commentRepo, bilibiliOnlineService, cfg.Bilibili.CommentLimit)
 	recommendationService := service.NewRecommendationService(recommendationRepo, resourceRepo, userRepo)
+	knowledgeService := service.NewKnowledgeService(knowledgeRepo)
 	recommendationImportService := service.NewRecommendationImportService(
 		recommendationRepo, recommendationRunRepo, userRepo, resourceRepo, cfg.Engine.RecommendationsFile,
 	)
@@ -65,6 +67,7 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	ratingHandler := handler.NewRatingHandler(ratingService)
 	commentHandler := handler.NewCommentHandler(resourceService, commentService)
 	recommendationHandler := handler.NewRecommendationHandler(recommendationService, recommendationImportService, recommendationRunRepo, statsRepo)
+	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeService)
 	adminHandler := handler.NewAdminHandler(adminService)
 
 	r := gin.New()
@@ -103,6 +106,10 @@ func New(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	protected.POST("/resources/:id/ratings", ratingHandler.Upsert)
 	protected.GET("/resources/:id/comments", commentHandler.List)
 	protected.GET("/recommendations", recommendationHandler.Get)
+	// 知识点导航：列表 / 图谱详情 / 知识点下的资源
+	protected.GET("/knowledge-points", knowledgeHandler.List)
+	protected.GET("/knowledge-points/:code", knowledgeHandler.Detail)
+	protected.GET("/knowledge-points/:code/resources", knowledgeHandler.Resources)
 	protected.GET("/admin/users", middleware.AdminRequired(userRepo), adminHandler.ListUsers)
 	protected.GET("/admin/resources", middleware.AdminRequired(userRepo), adminHandler.ListResources)
 	protected.POST("/admin/recommendations/import", middleware.AdminRequired(userRepo), recommendationHandler.Import)

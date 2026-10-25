@@ -51,5 +51,10 @@ func autoMigrate(db *gorm.DB) error {
 		&model.CommentFetchState{},
 		&model.Recommendation{},
 		&model.RecommendationRun{},
+		&model.KnowledgePoint{},
+		&model.KnowledgePointEdge{},
+		&model.ResourceKnowledgePoint{},
+		&model.KnowledgeConcept{},
+		&model.KnowledgeConceptEdge{},
 	)
 }

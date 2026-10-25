@@ -75,6 +75,15 @@ content_rules:
     - 讲解
   longform_min_minutes: 600
 
+# 知识图谱数据源（EMBEDD-ER / MOOCCube）：学科层用本仓库数据，概念层从这里导入。
+#
+# 这是**临时路径**：现在指向与 platform 并列的 EMBEDD-ER 仓库；
+# 后续整个项目迁入 engine 后，只需改这一处（或设置环境变量 KNOWLEDGE_SOURCE_DIR），
+# 也可以用 scripts/set-kg-source.ps1 一键切换，不必改代码。
+# 路径相对 backend/ 运行目录解析。
+knowledge:
+  source_dir: "../../EMBEDD-ER/data/MOOCCube"
+
 # 第三方数据集导入（cmd/import_dataset）。各家数据集的字段名和格式都不一样，
 # 所以对应关系全部写在下面，换数据集只改这一段，不动代码。
 # 三步走：
