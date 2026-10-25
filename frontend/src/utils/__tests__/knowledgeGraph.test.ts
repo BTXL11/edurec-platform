@@ -9,6 +9,7 @@ function node(id: number, level: number, name = `n${id}`): KnowledgeNode {
     name,
     description: '',
     level,
+    discipline_code: '',
     resource_count: id,
     concept_count: 0,
   }

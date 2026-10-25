@@ -4,8 +4,8 @@ import type { KnowledgeEdge, KnowledgeNode } from '@/types'
 import KnowledgeGraph from '../KnowledgeGraph.vue'
 
 const nodes: KnowledgeNode[] = [
-  { id: 1, code: 'calculus', name: '高等数学', description: '', level: 1, resource_count: 10, concept_count: 3 },
-  { id: 2, code: 'analysis', name: '数学分析', description: '', level: 2, resource_count: 5, concept_count: 0 },
+  { id: 1, code: 'calculus', name: '高等数学', description: '', level: 1, discipline_code: 'math', resource_count: 10, concept_count: 3 },
+  { id: 2, code: 'analysis', name: '数学分析', description: '', level: 2, discipline_code: 'math', resource_count: 5, concept_count: 0 },
 ]
 
 const edges: KnowledgeEdge[] = [{ from: 1, to: 2 }]
@@ -42,3 +42,4 @@ describe('KnowledgeGraph', () => {
     expect(wrapper.find('svg').exists()).toBe(false)
   })
 })
+

@@ -125,8 +125,13 @@ watch(code, load)
 
 <template>
   <div class="mx-auto max-w-7xl px-6 py-10">
-    <RouterLink :to="{ name: 'knowledge' }" class="text-sm text-primary hover:underline">
-      ← 返回知识点导航
+    <RouterLink
+      :to="detail?.point.discipline_code
+        ? { name: 'discipline', params: { code: detail.point.discipline_code } }
+        : { name: 'knowledge' }"
+      class="text-sm text-primary hover:underline"
+    >
+      ← {{ detail?.point.discipline_code ? '返回所属学科' : '返回学科导航' }}
     </RouterLink>
 
     <div v-if="loading" class="mt-8">

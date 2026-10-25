@@ -12,11 +12,11 @@ const mockedList = vi.mocked(listKnowledgePoints)
 const points: KnowledgeNode[] = [
   {
     id: 1, code: 'linear-algebra', name: '线性代数', description: '向量空间与矩阵',
-    level: 1, resource_count: 15, concept_count: 19,
+    level: 1, discipline_code: 'math', resource_count: 15, concept_count: 19,
   },
   {
     id: 2, code: 'analysis', name: '数学分析', description: '极限与积分的严格理论',
-    level: 2, resource_count: 26, concept_count: 0,
+    level: 2, discipline_code: 'math', resource_count: 26, concept_count: 0,
   },
 ]
 

@@ -53,8 +53,39 @@ export interface KnowledgeNode {
   name: string
   description: string
   level: number
+  discipline_code: string
   resource_count: number
   concept_count: number
+}
+
+/** 学科（主页面入口） */
+export interface Discipline {
+  code: string
+  name: string
+  description: string
+  point_count: number
+  resource_count: number
+}
+
+/** 学科详情：学科下的知识点与资源 */
+export interface DisciplineDetail {
+  discipline: Discipline
+  points: KnowledgeNode[]
+  resources: Resource[]
+  resource_total: number
+}
+
+/** 学科资源自动爬取状态 */
+export interface DisciplineCrawlStatus {
+  discipline_code: string
+  status: 'idle' | 'running' | 'done' | 'failed'
+  imported: number
+  linked: number
+  resource_total: number
+  keyword?: string
+  error?: string
+  started_at?: string
+  finished_at?: string
 }
 
 /** 知识点先修边：from 学完才能学 to */

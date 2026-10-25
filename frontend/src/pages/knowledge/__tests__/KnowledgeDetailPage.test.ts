@@ -40,12 +40,12 @@ const resource: Resource = {
 const detail: KnowledgeDetail = {
   point: {
     id: 2, code: 'mathematical-analysis', name: '数学分析', description: '极限与积分的严格理论',
-    level: 2, resource_count: 26, concept_count: 0,
+    level: 2, discipline_code: 'math', resource_count: 26, concept_count: 0,
   },
   nodes: [
-    { id: 1, code: 'calculus', name: '高等数学', description: '', level: 1, resource_count: 43, concept_count: 91 },
-    { id: 2, code: 'mathematical-analysis', name: '数学分析', description: '', level: 2, resource_count: 26, concept_count: 0 },
-    { id: 3, code: 'linear-algebra', name: '线性代数', description: '', level: 1, resource_count: 15, concept_count: 19 },
+    { id: 1, code: 'calculus', name: '高等数学', description: '', level: 1, discipline_code: 'math', resource_count: 43, concept_count: 91 },
+    { id: 2, code: 'mathematical-analysis', name: '数学分析', description: '', level: 2, discipline_code: 'math', resource_count: 26, concept_count: 0 },
+    { id: 3, code: 'linear-algebra', name: '线性代数', description: '', level: 1, discipline_code: 'math', resource_count: 15, concept_count: 19 },
   ],
   edges: [{ from: 1, to: 2 }],
   resources: [resource],
@@ -155,3 +155,4 @@ describe('KnowledgeDetailPage', () => {
     expect(mockedGenerationStatus).not.toHaveBeenCalled()
   })
 })
+

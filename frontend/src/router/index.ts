@@ -8,8 +8,9 @@ import LoginPage from '@/pages/auth/LoginPage.vue'
 import RegisterPage from '@/pages/auth/RegisterPage.vue'
 import ResourceDetailPage from '@/pages/resource/ResourceDetailPage.vue'
 import SearchPage from '@/pages/search/SearchPage.vue'
-import KnowledgeListPage from '@/pages/knowledge/index.vue'
 import KnowledgeDetailPage from '@/pages/knowledge/DetailPage.vue'
+import DisciplineListPage from '@/pages/discipline/index.vue'
+import DisciplineDetailPage from '@/pages/discipline/DetailPage.vue'
 import QuestionnairePage from '@/pages/questionnaire/index.vue'
 import LearningPathPage from '@/pages/learning-path/DetailPage.vue'
 import ProfilePage from '@/pages/user/ProfilePage.vue'
@@ -28,7 +29,13 @@ const routes = [
     children: [
       { path: '', name: 'home', component: HomePage, meta: { requiresAuth: true } },
       { path: 'search', name: 'search', component: SearchPage, meta: { requiresAuth: true } },
-      { path: 'knowledge', name: 'knowledge', component: KnowledgeListPage, meta: { requiresAuth: true } },
+      { path: 'knowledge', name: 'knowledge', component: DisciplineListPage, meta: { requiresAuth: true } },
+      {
+        path: 'discipline/:code',
+        name: 'discipline',
+        component: DisciplineDetailPage,
+        meta: { requiresAuth: true },
+      },
       {
         path: 'knowledge/:code',
         name: 'knowledge-detail',
