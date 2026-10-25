@@ -8,6 +8,8 @@ import LoginPage from '@/pages/auth/LoginPage.vue'
 import RegisterPage from '@/pages/auth/RegisterPage.vue'
 import ResourceDetailPage from '@/pages/resource/ResourceDetailPage.vue'
 import SearchPage from '@/pages/search/SearchPage.vue'
+import KnowledgeListPage from '@/pages/knowledge/index.vue'
+import KnowledgeDetailPage from '@/pages/knowledge/DetailPage.vue'
 import ProfilePage from '@/pages/user/ProfilePage.vue'
 import UploadPage from '@/pages/upload/UploadPage.vue'
 import AdminDashboard from '@/pages/admin/AdminDashboard.vue'
@@ -24,6 +26,13 @@ const routes = [
     children: [
       { path: '', name: 'home', component: HomePage, meta: { requiresAuth: true } },
       { path: 'search', name: 'search', component: SearchPage, meta: { requiresAuth: true } },
+      { path: 'knowledge', name: 'knowledge', component: KnowledgeListPage, meta: { requiresAuth: true } },
+      {
+        path: 'knowledge/:code',
+        name: 'knowledge-detail',
+        component: KnowledgeDetailPage,
+        meta: { requiresAuth: true },
+      },
       { path: 'resources/:id', name: 'resource-detail', component: ResourceDetailPage, meta: { requiresAuth: true } },
       { path: 'user/me', name: 'user-me', component: ProfilePage, meta: { requiresAuth: true } },
       {

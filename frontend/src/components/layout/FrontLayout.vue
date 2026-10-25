@@ -59,6 +59,11 @@ function submitSearch() {
             exact-active-class="text-primary font-medium"
           >首页</RouterLink>
           <RouterLink
+            :to="{ name: 'knowledge' }"
+            class="transition-colors duration-150 hover:text-primary"
+            :class="route.name?.toString().startsWith('knowledge') ? 'text-primary font-medium' : ''"
+          >知识点</RouterLink>
+          <RouterLink
             :to="{ name: 'search' }"
             class="transition-colors duration-150 hover:text-primary"
             :class="route.name === 'search' && !activeType ? 'text-primary font-medium' : ''"

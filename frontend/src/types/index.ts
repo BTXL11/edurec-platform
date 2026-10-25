@@ -46,6 +46,45 @@ export interface Resource {
 // 学习难度：与后端 model.Difficulty* 常量一致
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced'
 
+/** 知识点节点（学科级），与后端 service.KnowledgeNode 对齐 */
+export interface KnowledgeNode {
+  id: number
+  code: string
+  name: string
+  description: string
+  level: number
+  resource_count: number
+  concept_count: number
+}
+
+/** 知识点先修边：from 学完才能学 to */
+export interface KnowledgeEdge {
+  from: number
+  to: number
+}
+
+/** 概念级知识点（来自 EMBEDD-ER / MOOCCube） */
+export interface KnowledgeConcept {
+  id: number
+  code: string
+  name: string
+  field: string
+  point_code: string
+  level: number
+  explanation?: string
+}
+
+/** 知识点详情：学科图 + 概念子图 + 资源 */
+export interface KnowledgeDetail {
+  point: KnowledgeNode
+  nodes: KnowledgeNode[]
+  edges: KnowledgeEdge[]
+  resources: Resource[]
+  resource_total: number
+  concepts: KnowledgeConcept[]
+  concept_edges: KnowledgeEdge[]
+}
+
 export interface Rating {
   id: number
   user: Pick<User, 'id' | 'username' | 'display_name' | 'avatar_url'>

@@ -22,6 +22,8 @@ async function mountLayout() {
       { path: '/login', name: 'login', component: { template: '<div>登录</div>' } },
       { path: '/user/me', name: 'user-me', component: { template: '<div>个人中心</div>' } },
       { path: '/search', name: 'search', component: SearchStub },
+      { path: '/knowledge', name: 'knowledge', component: { template: '<div>知识点</div>' } },
+      { path: '/knowledge/:code', name: 'knowledge-detail', component: { template: '<div>知识点详情</div>' } },
     ],
   })
   await router.push('/')
