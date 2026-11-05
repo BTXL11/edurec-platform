@@ -11,7 +11,8 @@ const items = ref<LearningProfileItem[]>([])
 const answers = ref<Record<string, number>>({})
 // 原始值用于区分「未改动」与「已改动」：朱红只留给真正的改动与保存动作
 const baseline = ref<Record<string, number>>({})
-const openLevels = ref<Record<number, boolean>>({})
+// 按学科折叠：同一学科内再按层级由基础到进阶排列
+const openDisciplines = ref<Record<string, boolean>>({})
 // 批量“全部按没接触过”的撤销快照：避免一键覆盖已填/行为估计的答案
 const bulkUndo = ref<Record<string, number> | null>(null)
 const loading = ref(true)
@@ -27,16 +28,23 @@ function levelColor(level: number): string {
 }
 
 const grouped = computed(() => {
-  const map = new Map<number, LearningProfileItem[]>()
+  const map = new Map<string, { code: string; name: string; items: LearningProfileItem[] }>()
   for (const item of items.value) {
-    const level = Math.max(1, item.level || 1)
-    const group = map.get(level) ?? []
-    group.push(item)
-    map.set(level, group)
+    const code = item.discipline_code || 'other'
+    const name = item.discipline_name || '其他'
+    const group = map.get(code) ?? { code, name, items: [] }
+    group.items.push(item)
+    map.set(code, group)
   }
-  return [...map.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([level, list]) => ({ level, items: list }))
+  return [...map.values()]
+    .map((group) => ({
+      ...group,
+      items: [...group.items].sort(
+        (a, b) => (a.level || 1) - (b.level || 1) || a.name.localeCompare(b.name, 'zh-CN'),
+      ),
+      minLevel: Math.min(...group.items.map((item) => Math.max(1, item.level || 1))),
+    }))
+    .sort((a, b) => a.minLevel - b.minLevel || a.name.localeCompare(b.name, 'zh-CN'))
 })
 
 const changedCount = computed(
@@ -44,22 +52,22 @@ const changedCount = computed(
 )
 
 const allOpen = computed(
-  () => grouped.value.length > 0 && grouped.value.every((group) => openLevels.value[group.level]),
+  () => grouped.value.length > 0 && grouped.value.every((group) => openDisciplines.value[group.code]),
 )
 
-function changedInGroup(level: number): number {
-  const group = grouped.value.find((entry) => entry.level === level)
+function changedInGroup(code: string): number {
+  const group = grouped.value.find((entry) => entry.code === code)
   if (!group) return 0
   return group.items.filter((item) => answers.value[item.point_code] !== baseline.value[item.point_code]).length
 }
 
-function toggleLevel(level: number) {
-  openLevels.value[level] = !openLevels.value[level]
+function toggleDiscipline(code: string) {
+  openDisciplines.value[code] = !openDisciplines.value[code]
 }
 
 function toggleAll() {
   const next = !allOpen.value
-  for (const group of grouped.value) openLevels.value[group.level] = next
+  for (const group of grouped.value) openDisciplines.value[group.code] = next
 }
 
 function setAllUnseen() {
@@ -102,10 +110,10 @@ async function load() {
     answers.value = initial
     baseline.value = { ...initial }
 
-    // 默认只展开第一层，其余层折叠，避免 72 行一次铺满
-    openLevels.value = {}
-    const firstLevel = grouped.value[0]?.level
-    if (firstLevel !== undefined) openLevels.value[firstLevel] = true
+    // 默认只展开第一个学科，其余折叠，避免一百多个知识点一次铺满
+    openDisciplines.value = {}
+    const firstDiscipline = grouped.value[0]?.code
+    if (firstDiscipline) openDisciplines.value[firstDiscipline] = true
   } catch (e) {
     error.value = e instanceof Error ? e.message : '加载失败'
   } finally {
@@ -135,7 +143,7 @@ onMounted(load)
       <div>
         <h1 class="text-2xl font-bold tracking-tight text-ink sm:text-3xl">初始学习问卷</h1>
         <p class="mt-2 max-w-2xl text-sm leading-relaxed text-ink-secondary">
-          按你的真实水平自评每个知识点，系统会据此跳过已掌握内容，只推荐路径上还没掌握的部分。以后可以随时回来重做。
+          按学科分组，逐项自评你的真实水平；系统会据此跳过已掌握内容，只推荐路径上还没掌握的部分。以后可以随时回来重做。
         </p>
       </div>
       <RouterLink :to="{ name: 'knowledge' }">
@@ -170,29 +178,33 @@ onMounted(load)
         </div>
       </div>
 
+      <p v-if="grouped.length === 0" class="mt-6 rounded-[4px] border border-dashed border-border px-6 py-12 text-center text-sm text-ink-secondary">
+        暂无可自评的知识点。
+      </p>
+
       <section
         v-for="group in grouped"
-        :key="group.level"
+        :key="group.code"
         class="mt-4 overflow-hidden rounded-[4px] border border-border bg-surface"
       >
         <button
           type="button"
           class="flex w-full flex-wrap items-center gap-3 border-b border-border px-5 py-3 text-left transition-colors"
-          :style="{ backgroundColor: `${levelColor(group.level)}0F` }"
-          :aria-expanded="!!openLevels[group.level]"
-          @click="toggleLevel(group.level)"
+          :style="{ backgroundColor: `${levelColor(group.minLevel)}0F` }"
+          :aria-expanded="!!openDisciplines[group.code]"
+          @click="toggleDiscipline(group.code)"
         >
-          <span class="line-chip" :style="{ '--chip': levelColor(group.level) }">L{{ group.level }}</span>
-          <span class="text-sm font-semibold text-ink">第 {{ group.level }} 层</span>
+          <span class="line-chip" :style="{ '--chip': levelColor(group.minLevel) }">{{ group.code.toUpperCase() }}</span>
+          <span class="text-sm font-semibold text-ink">{{ group.name }}</span>
           <span class="data-num text-xs text-ink-muted">{{ group.items.length }} 个知识点</span>
           <span
-            v-if="changedInGroup(group.level) > 0"
+            v-if="changedInGroup(group.code) > 0"
             class="data-num rounded-[3px] bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary-active"
-          >已改 {{ changedInGroup(group.level) }}</span>
+          >已改 {{ changedInGroup(group.code) }}</span>
           <svg
             viewBox="0 0 24 24"
             class="ml-auto h-4 w-4 text-ink-muted transition-transform duration-200"
-            :class="openLevels[group.level] ? 'rotate-180' : ''"
+            :class="openDisciplines[group.code] ? 'rotate-180' : ''"
             fill="none"
             aria-hidden="true"
           >
@@ -200,15 +212,19 @@ onMounted(load)
           </svg>
         </button>
 
-        <div v-show="openLevels[group.level]" class="divide-y divide-border">
+        <div v-show="openDisciplines[group.code]" class="divide-y divide-border">
           <div
             v-for="item in group.items"
             :key="item.point_code"
             class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-bg/40"
           >
-            <div class="min-w-40">
+            <div class="flex min-w-40 flex-wrap items-center gap-2">
+              <span
+                class="data-num rounded-[3px] px-1.5 py-0.5 text-[11px] font-semibold text-white"
+                :style="{ backgroundColor: levelColor(item.level) }"
+              >L{{ item.level }}</span>
               <span class="text-sm font-medium text-ink">{{ item.name }}</span>
-              <span v-if="item.source" class="ml-2 text-xs text-ink-muted">
+              <span v-if="item.source" class="text-xs text-ink-muted">
                 （当前：{{ item.source === 'behavior' ? '行为估计' : '已填写' }}）
               </span>
             </div>

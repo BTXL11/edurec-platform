@@ -137,13 +137,15 @@ export interface KnowledgeDetail {
   concept_edges: KnowledgeEdge[]
 }
 
-/** 知识画像条目：某知识点的掌握度（0-1）与来源 */
+/** 知识画像条目：某知识点的掌握度（0-1）、来源与所属学科 */
 export interface LearningProfileItem {
   point_code: string
   name: string
   level: number
   mastery: number
   source: string
+  discipline_code: string
+  discipline_name: string
 }
 
 export type PathStepStatus = 'done' | 'current' | 'locked'

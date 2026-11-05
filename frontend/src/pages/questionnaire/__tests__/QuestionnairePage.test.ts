@@ -19,9 +19,10 @@ const mockedProfile = vi.mocked(getLearningProfile)
 const mockedSubmit = vi.mocked(submitQuestionnaire)
 
 const profile: LearningProfileItem[] = [
-  { point_code: 'calculus', name: '高等数学', level: 1, mastery: 1, source: 'questionnaire' },
-  { point_code: 'linear-algebra', name: '线性代数', level: 1, mastery: 0.33, source: 'questionnaire' },
-  { point_code: 'analysis', name: '数学分析', level: 2, mastery: 0, source: '' },
+  { point_code: 'calculus', name: '高等数学', level: 1, mastery: 1, source: 'questionnaire', discipline_code: 'math', discipline_name: '数学' },
+  { point_code: 'linear-algebra', name: '线性代数', level: 1, mastery: 0.33, source: 'questionnaire', discipline_code: 'math', discipline_name: '数学' },
+  { point_code: 'analysis', name: '数学分析', level: 2, mastery: 0, source: '', discipline_code: 'math', discipline_name: '数学' },
+  { point_code: 'machine-learning', name: '机器学习', level: 3, mastery: 0, source: '', discipline_code: 'ai', discipline_name: '人工智能' },
 ]
 
 async function mountPage() {
@@ -37,18 +38,19 @@ describe('QuestionnairePage', () => {
     mockedSubmit.mockResolvedValue(profile)
   })
 
-  it('按层级展示知识点并把已有掌握度回填为自评等级', async () => {
+  it('按学科分组展示知识点并把已有掌握度回填为自评等级', async () => {
     const wrapper = await mountPage()
 
     expect(wrapper.text()).toContain('初始学习问卷')
+    expect(wrapper.text()).toContain('数学')
+    expect(wrapper.text()).toContain('人工智能')
     expect(wrapper.text()).toContain('高等数学')
-    expect(wrapper.text()).toContain('第 2 层')
     // mastery 1 → 等级 3；0.33 → 1；0 → 0
     const checked = wrapper.findAll('[role="radio"][aria-checked="true"]')
-    expect(checked.length).toBeGreaterThanOrEqual(3)
+    expect(checked.length).toBe(4)
   })
 
-  it('默认只展开第一层，可切换全部展开/收起', async () => {
+  it('默认只展开第一个学科，可切换全部展开/收起', async () => {
     const wrapper = await mountPage()
 
     const headers = wrapper.findAll('section > button[aria-expanded]')
@@ -86,6 +88,7 @@ describe('QuestionnairePage', () => {
       calculus: 3,
       'linear-algebra': 1,
       analysis: 0,
+      'machine-learning': 0,
     })
     expect(pushMock).toHaveBeenCalledWith({ name: 'knowledge' })
   })

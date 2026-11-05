@@ -23,13 +23,16 @@ func NewLearningService(
 	return &LearningService{knowledge: knowledge, learning: learning}
 }
 
-// ProfileItem 知识画像条目：某知识点的掌握度与来源
+// ProfileItem 知识画像条目：某知识点的掌握度与来源。
+// 带上所属学科，问卷与画像可以按学科分组展示，而不是把所有知识点摊成一张长表。
 type ProfileItem struct {
-	PointCode string  `json:"point_code"`
-	Name      string  `json:"name"`
-	Level     int     `json:"level"`
-	Mastery   float32 `json:"mastery"`
-	Source    string  `json:"source"`
+	PointCode      string  `json:"point_code"`
+	Name           string  `json:"name"`
+	Level          int     `json:"level"`
+	Mastery        float32 `json:"mastery"`
+	Source         string  `json:"source"`
+	DisciplineCode string  `json:"discipline_code"`
+	DisciplineName string  `json:"discipline_name"`
 }
 
 // LearningPathView 学习路径视图
@@ -73,6 +76,15 @@ func (s *LearningService) Profile(userID uint) ([]ProfileItem, error) {
 		behaviorMastery[pointID] = value
 	}
 
+	disciplines, err := s.knowledge.ListDisciplines()
+	if err != nil {
+		return nil, apperror.Internal(err)
+	}
+	disciplineNames := make(map[string]string, len(disciplines))
+	for i := range disciplines {
+		disciplineNames[disciplines[i].Code] = disciplines[i].Name
+	}
+
 	items := make([]ProfileItem, 0, len(points))
 	for i := range points {
 		point := &points[i]
@@ -87,11 +99,13 @@ func (s *LearningService) Profile(userID uint) ([]ProfileItem, error) {
 			source = "behavior"
 		}
 		items = append(items, ProfileItem{
-			PointCode: point.Code,
-			Name:      point.Name,
-			Level:     point.Level,
-			Mastery:   mastery,
-			Source:    source,
+			PointCode:      point.Code,
+			Name:           point.Name,
+			Level:          point.Level,
+			Mastery:        mastery,
+			Source:         source,
+			DisciplineCode: point.DisciplineCode,
+			DisciplineName: disciplineNames[point.DisciplineCode],
 		})
 	}
 	return items, nil
@@ -386,4 +400,3 @@ func (s *LearningService) toPathView(path *model.LearningPath) (*LearningPathVie
 		Status:       path.Status,
 	}, nil
 }
-
