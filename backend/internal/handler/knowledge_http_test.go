@@ -19,6 +19,7 @@ type fakeKnowledgeRepo struct {
 	repository.KnowledgeRepository
 	point      *model.KnowledgePoint
 	discipline *model.Discipline
+	resources  []model.Resource
 }
 
 func (f *fakeKnowledgeRepo) ListPoints() ([]model.KnowledgePoint, error) { return nil, nil }
@@ -58,7 +59,7 @@ func (f *fakeKnowledgeRepo) ListPointsByDiscipline(string) ([]model.KnowledgePoi
 }
 
 func (f *fakeKnowledgeRepo) ListResourcesByDiscipline(string, int, int) ([]model.Resource, int64, error) {
-	return nil, 0, nil
+	return f.resources, int64(len(f.resources)), nil
 }
 
 type envelope struct {
@@ -143,4 +144,38 @@ func TestDisciplineDetailEmptyResourcesIsArray(t *testing.T) {
 	}, "/disciplines/math")
 
 	assertArrayFields(t, body.Data, "points", "resources")
+}
+
+// 学科详情的资源必须带小写 id；直接序列化 GORM 模型会得到 ID，
+// 前端 RouterLink 取不到主键，点击知识点/资源时路由中断。
+func TestDisciplineDetailResourcesUseListDTO(t *testing.T) {
+	repo := &fakeKnowledgeRepo{
+		discipline: &model.Discipline{Code: "math", Name: "数学"},
+		resources: []model.Resource{{
+			Title: "高等数学",
+			Tags:  `["高数"]`,
+		}},
+	}
+	repo.resources[0].ID = 63
+	h := handler.NewDisciplineHandler(service.NewDisciplineService(repo), nil)
+
+	body := serve(t, func(r *gin.Engine) {
+		r.GET("/disciplines/:code", h.Detail)
+	}, "/disciplines/math")
+
+	var data struct {
+		Resources []map[string]json.RawMessage `json:"resources"`
+	}
+	if err := json.Unmarshal(body.Data, &data); err != nil {
+		t.Fatalf("解析 resources 失败: %v; data=%s", err, body.Data)
+	}
+	if len(data.Resources) != 1 {
+		t.Fatalf("resources 长度 = %d, want 1", len(data.Resources))
+	}
+	if _, ok := data.Resources[0]["ID"]; ok {
+		t.Errorf("resources[0] 含大写 ID 字段，说明仍在使用 GORM 模型序列化")
+	}
+	if got := string(data.Resources[0]["id"]); got != "63" {
+		t.Errorf("resources[0].id = %s, want 63", got)
+	}
 }

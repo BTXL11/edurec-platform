@@ -42,7 +42,21 @@ func (h *DisciplineHandler) Detail(c *gin.Context) {
 		handleError(c, err)
 		return
 	}
-	response.OK(c, detail)
+
+	// 学科详情里的资源必须使用与知识点详情一致的列表 DTO。
+	// 直接返回 GORM 模型会得到大写字段（ID/CreatedAt），前端按 resource.id
+	// 取不到主键，RouterLink 会因缺少 id 参数而中断整棵路由组件的渲染。
+	resources := make([]resourceListItem, 0, len(detail.Resources))
+	for i := range detail.Resources {
+		resources = append(resources, toResourceListItem(&detail.Resources[i]))
+	}
+
+	response.OK(c, gin.H{
+		"discipline":     detail.Discipline,
+		"points":         detail.Points,
+		"resources":      resources,
+		"resource_total": detail.ResourceTotal,
+	})
 }
 
 // Crawl POST /disciplines/:code/crawl：无资源时自动去 B 站抓取
