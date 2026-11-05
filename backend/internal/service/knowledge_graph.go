@@ -79,8 +79,15 @@ var DefaultKnowledgePoints = []KnowledgePointSeed{
 	{Code: "operating-systems", Name: "操作系统", DisciplineCode: "computer", Description: "进程、内存、文件系统与并发", Keywords: []string{"操作系统"}},
 	{Code: "computer-networks", Name: "计算机网络", DisciplineCode: "computer", Description: "TCP/IP、路由、传输层与应用层", Keywords: []string{"计算机网络"}},
 	{Code: "database-systems", Name: "数据库系统", DisciplineCode: "computer", Description: "关系模型、SQL、事务与索引", Keywords: []string{"数据库", "SQL"}},
+	{Code: "computer-architecture", Name: "计算机组成", DisciplineCode: "computer", Description: "指令系统、处理器、存储与总线", Keywords: []string{"计算机组成", "体系结构"}},
+	{Code: "software-engineering", Name: "软件工程", DisciplineCode: "computer", Description: "需求、设计、测试与项目管理", Keywords: []string{"软件工程"}},
+	{Code: "distributed-systems", Name: "分布式系统", DisciplineCode: "computer", Description: "一致性、复制、容错与共识", Keywords: []string{"分布式系统"}},
+	{Code: "cloud-computing", Name: "云计算", DisciplineCode: "computer", Description: "虚拟化、容器、编排与云原生", Keywords: []string{"云计算", "云原生"}},
 	{Code: "machine-learning", Name: "机器学习", DisciplineCode: "ai", Description: "监督学习、无监督学习与模型评估", Keywords: []string{"机器学习", "机器学习入门"}},
 	{Code: "deep-learning", Name: "深度学习", DisciplineCode: "ai", Description: "神经网络、反向传播与深度模型", Keywords: []string{"深度学习", "神经网络", "大模型"}},
+	{Code: "natural-language-processing", Name: "自然语言处理", DisciplineCode: "ai", Description: "文本表示、语言模型与信息抽取", Keywords: []string{"自然语言处理", "NLP"}},
+	{Code: "computer-vision", Name: "计算机视觉", DisciplineCode: "ai", Description: "图像特征、检测、分割与三维视觉", Keywords: []string{"计算机视觉", "图像识别"}},
+	{Code: "reinforcement-learning", Name: "强化学习", DisciplineCode: "ai", Description: "马尔可夫决策、价值学习与策略优化", Keywords: []string{"强化学习"}},
 
 	// 物理
 	{Code: "college-physics", Name: "大学物理", DisciplineCode: "physics", Description: "力、热、光、电的基础物理图景", Keywords: []string{"大学物理", "普通物理"}},
@@ -89,75 +96,113 @@ var DefaultKnowledgePoints = []KnowledgePointSeed{
 	{Code: "thermodynamics", Name: "热力学与统计物理", DisciplineCode: "physics", Description: "热力学定律、熵与统计分布", Keywords: []string{"热力学", "统计物理"}},
 	{Code: "quantum-mechanics", Name: "量子力学", DisciplineCode: "physics", Description: "波函数、算符、氢原子与量子测量", Keywords: []string{"量子力学"}},
 	{Code: "optics", Name: "光学", DisciplineCode: "physics", Description: "几何光学、波动光学与激光", Keywords: []string{"光学"}},
+	{Code: "statistical-mechanics", Name: "统计力学", DisciplineCode: "physics", Description: "从微观粒子统计出发推导热力学规律", Keywords: []string{"统计力学", "统计物理"}},
+	{Code: "condensed-matter-physics", Name: "凝聚态物理", DisciplineCode: "physics", Description: "固体、液体与低维体系的集体行为", Keywords: []string{"凝聚态物理", "固体物理"}},
 
 	// 化学
 	{Code: "inorganic-chemistry", Name: "无机化学", DisciplineCode: "chemistry", Description: "元素化学、配位化学与结构", Keywords: []string{"无机化学"}},
 	{Code: "organic-chemistry", Name: "有机化学", DisciplineCode: "chemistry", Description: "官能团、反应机理与合成", Keywords: []string{"有机化学"}},
 	{Code: "physical-chemistry", Name: "物理化学", DisciplineCode: "chemistry", Description: "化学热力学、动力学与电化学", Keywords: []string{"物理化学"}},
 	{Code: "analytical-chemistry", Name: "分析化学", DisciplineCode: "chemistry", Description: "滴定、光谱与色谱分析", Keywords: []string{"分析化学"}},
+	{Code: "polymer-chemistry", Name: "高分子化学", DisciplineCode: "chemistry", Description: "高分子合成、结构与性能", Keywords: []string{"高分子化学", "高分子"}},
+	{Code: "computational-chemistry", Name: "计算化学", DisciplineCode: "chemistry", Description: "量子化学计算与分子模拟", Keywords: []string{"计算化学", "量子化学"}},
 
 	// 生物
 	{Code: "cell-biology", Name: "细胞生物学", DisciplineCode: "biology", Description: "细胞结构、代谢与信号转导", Keywords: []string{"细胞生物学"}},
 	{Code: "genetics", Name: "遗传学", DisciplineCode: "biology", Description: "孟德尔遗传、基因表达与变异", Keywords: []string{"遗传学"}},
 	{Code: "biochemistry", Name: "生物化学", DisciplineCode: "biology", Description: "蛋白质、酶与代谢通路", Keywords: []string{"生物化学"}},
 	{Code: "ecology", Name: "生态学", DisciplineCode: "biology", Description: "种群、群落与生态系统", Keywords: []string{"生态学"}},
+	{Code: "molecular-biology", Name: "分子生物学", DisciplineCode: "biology", Description: "基因复制、转录、翻译与调控", Keywords: []string{"分子生物学"}},
+	{Code: "systems-biology", Name: "系统生物学", DisciplineCode: "biology", Description: "用网络与模型研究生物系统", Keywords: []string{"系统生物学"}},
 
 	// 天文 / 地理 / 环境
 	{Code: "intro-astronomy", Name: "天文学导论", DisciplineCode: "astronomy", Description: "星空、恒星演化与宇宙学基础", Keywords: []string{"天文学", "天文"}},
 	{Code: "astrophysics", Name: "天体物理", DisciplineCode: "astronomy", Description: "恒星结构、星系与宇宙学", Keywords: []string{"天体物理"}},
+	{Code: "cosmology", Name: "宇宙学", DisciplineCode: "astronomy", Description: "宇宙膨胀、暗物质与结构形成", Keywords: []string{"宇宙学"}},
 	{Code: "physical-geography", Name: "自然地理学", DisciplineCode: "geography", Description: "地貌、气候、水文与土壤", Keywords: []string{"自然地理"}},
 	{Code: "human-geography", Name: "人文地理学", DisciplineCode: "geography", Description: "人口、城市、经济与文化地理", Keywords: []string{"人文地理"}},
+	{Code: "gis", Name: "地理信息系统", DisciplineCode: "geography", Description: "空间数据采集、管理与分析", Keywords: []string{"地理信息系统", "GIS"}},
+	{Code: "regional-geography", Name: "区域地理", DisciplineCode: "geography", Description: "区域分异、区域规划与空间治理", Keywords: []string{"区域地理", "区域分析"}},
 	{Code: "intro-environmental-science", Name: "环境科学导论", DisciplineCode: "environment", Description: "环境系统、污染与可持续发展", Keywords: []string{"环境科学"}},
 	{Code: "environmental-chemistry", Name: "环境化学", DisciplineCode: "environment", Description: "大气、水体与土壤中的化学过程", Keywords: []string{"环境化学"}},
+	{Code: "environmental-engineering", Name: "环境工程", DisciplineCode: "environment", Description: "水、气、固废污染控制工程", Keywords: []string{"环境工程"}},
+	{Code: "ecological-restoration", Name: "生态修复", DisciplineCode: "environment", Description: "退化生态系统的诊断与修复", Keywords: []string{"生态修复"}},
 
 	// 经济 / 管理
 	{Code: "microeconomics", Name: "微观经济学", DisciplineCode: "economics", Description: "供求、消费者与厂商理论", Keywords: []string{"微观经济学"}},
 	{Code: "macroeconomics", Name: "宏观经济学", DisciplineCode: "economics", Description: "GDP、通胀、失业与宏观政策", Keywords: []string{"宏观经济学"}},
 	{Code: "finance", Name: "金融学", DisciplineCode: "economics", Description: "货币、投资与金融市场", Keywords: []string{"金融学", "金融"}},
+	{Code: "econometrics", Name: "计量经济学", DisciplineCode: "economics", Description: "回归、时间序列与因果推断", Keywords: []string{"计量经济学", "计量经济"}},
+	{Code: "international-economics", Name: "国际经济学", DisciplineCode: "economics", Description: "国际贸易、汇率与国际金融", Keywords: []string{"国际经济学", "国际贸易"}},
 	{Code: "management", Name: "管理学", DisciplineCode: "management", Description: "计划、组织、领导与控制", Keywords: []string{"管理学"}},
 	{Code: "marketing", Name: "市场营销", DisciplineCode: "management", Description: "市场分析、品牌与消费者行为", Keywords: []string{"市场营销"}},
+	{Code: "organizational-behavior", Name: "组织行为学", DisciplineCode: "management", Description: "个体、群体与组织中的行为规律", Keywords: []string{"组织行为学"}},
+	{Code: "strategic-management", Name: "战略管理", DisciplineCode: "management", Description: "竞争分析、公司战略与战略执行", Keywords: []string{"战略管理", "企业战略"}},
 
 	// 法学 / 教育 / 心理
 	{Code: "jurisprudence", Name: "法理学", DisciplineCode: "law", Description: "法的概念、渊源与法律解释", Keywords: []string{"法理学"}},
 	{Code: "civil-law", Name: "民法", DisciplineCode: "law", Description: "民事主体、物权、合同与侵权", Keywords: []string{"民法"}},
 	{Code: "criminal-law", Name: "刑法", DisciplineCode: "law", Description: "犯罪构成、刑罚与分则", Keywords: []string{"刑法"}},
+	{Code: "civil-procedure", Name: "民事诉讼法", DisciplineCode: "law", Description: "管辖、证据、审判与执行程序", Keywords: []string{"民事诉讼法", "民诉"}},
+	{Code: "criminal-procedure", Name: "刑事诉讼法", DisciplineCode: "law", Description: "侦查、起诉、审判与辩护制度", Keywords: []string{"刑事诉讼法", "刑诉"}},
 	{Code: "pedagogy", Name: "教育学原理", DisciplineCode: "education", Description: "教育本质、目的与制度", Keywords: []string{"教育学"}},
 	{Code: "educational-psychology", Name: "教育心理学", DisciplineCode: "education", Description: "学习理论、动机与教学心理", Keywords: []string{"教育心理学"}},
+	{Code: "curriculum-and-instruction", Name: "课程与教学论", DisciplineCode: "education", Description: "课程设计、教学理论与评价", Keywords: []string{"课程与教学论", "课程论"}},
+	{Code: "educational-research", Name: "教育研究方法", DisciplineCode: "education", Description: "教育研究设计、测量与统计", Keywords: []string{"教育研究方法", "教育研究"}},
 	{Code: "general-psychology", Name: "普通心理学", DisciplineCode: "psychology", Description: "感知、记忆、情绪与人格", Keywords: []string{"普通心理学", "心理学"}},
 	{Code: "developmental-psychology", Name: "发展心理学", DisciplineCode: "psychology", Description: "认知与社会性发展阶段", Keywords: []string{"发展心理学"}},
 	{Code: "cognitive-psychology", Name: "认知心理学", DisciplineCode: "psychology", Description: "注意、记忆、语言与决策", Keywords: []string{"认知心理学"}},
+	{Code: "social-psychology", Name: "社会心理学", DisciplineCode: "psychology", Description: "社会认知、态度与人际行为", Keywords: []string{"社会心理学"}},
+	{Code: "abnormal-psychology", Name: "变态心理学", DisciplineCode: "psychology", Description: "心理障碍的分类、成因与评估", Keywords: []string{"变态心理学", "异常心理学"}},
 
 	// 文学 / 历史 / 哲学
 	{Code: "ancient-chinese-literature", Name: "中国古代文学", DisciplineCode: "literature", Description: "先秦至明清文学史与作品", Keywords: []string{"中国古代文学"}},
 	{Code: "modern-chinese-literature", Name: "中国现当代文学", DisciplineCode: "literature", Description: "现当代文学思潮与作家作品", Keywords: []string{"现当代文学"}},
 	{Code: "world-literature", Name: "外国文学", DisciplineCode: "literature", Description: "欧美与东方文学经典", Keywords: []string{"外国文学"}},
+	{Code: "literary-theory", Name: "文学理论", DisciplineCode: "literature", Description: "文学本质、批评方法与文本分析", Keywords: []string{"文学理论", "文学批评"}},
+	{Code: "comparative-literature", Name: "比较文学", DisciplineCode: "literature", Description: "跨民族、跨语言与跨学科的文学研究", Keywords: []string{"比较文学"}},
 	{Code: "ancient-chinese-history", Name: "中国古代史", DisciplineCode: "history", Description: "先秦至明清的政治与社会", Keywords: []string{"中国古代史"}},
 	{Code: "modern-chinese-history", Name: "中国近现代史", DisciplineCode: "history", Description: "近代转型与现代中国", Keywords: []string{"中国近现代史", "近代史"}},
 	{Code: "world-history", Name: "世界史", DisciplineCode: "history", Description: "全球文明与近现代世界", Keywords: []string{"世界史"}},
+	{Code: "modern-world-history", Name: "世界近现代史", DisciplineCode: "history", Description: "大航海、工业革命与全球现代转型", Keywords: []string{"世界近现代史", "世界近代史"}},
+	{Code: "historiography", Name: "史学理论", DisciplineCode: "history", Description: "史学史、史料学与历史解释", Keywords: []string{"史学理论", "史学史"}},
 	{Code: "chinese-philosophy", Name: "中国哲学", DisciplineCode: "philosophy", Description: "先秦诸子、理学与心学", Keywords: []string{"中国哲学"}},
 	{Code: "western-philosophy", Name: "西方哲学", DisciplineCode: "philosophy", Description: "古希腊至德国古典哲学", Keywords: []string{"西方哲学"}},
 	{Code: "logic", Name: "逻辑学", DisciplineCode: "philosophy", Description: "命题逻辑、谓词逻辑与论证", Keywords: []string{"逻辑学"}},
 	{Code: "ethics", Name: "伦理学", DisciplineCode: "philosophy", Description: "规范伦理、元伦理与应用伦理", Keywords: []string{"伦理学"}},
+	{Code: "epistemology", Name: "认识论", DisciplineCode: "philosophy", Description: "知识的来源、确证与限度", Keywords: []string{"认识论", "知识论"}},
+	{Code: "metaphysics", Name: "形而上学", DisciplineCode: "philosophy", Description: "存在、实体、因果与自由意志", Keywords: []string{"形而上学"}},
 
 	// 外语
 	{Code: "college-english", Name: "大学英语", DisciplineCode: "foreign", Description: "词汇、语法、阅读与写作", Keywords: []string{"大学英语"}},
 	{Code: "ielts", Name: "雅思备考", DisciplineCode: "foreign", Description: "听力、口语、阅读、写作四科备考", Keywords: []string{"雅思"}},
 	{Code: "translation", Name: "翻译", DisciplineCode: "foreign", Description: "英汉互译技巧与实务", Keywords: []string{"翻译"}},
+	{Code: "linguistics", Name: "语言学", DisciplineCode: "foreign", Description: "语音、句法、语义与语言习得", Keywords: []string{"语言学"}},
 
 	// 医学 / 工学 / 艺术
 	{Code: "anatomy", Name: "解剖学", DisciplineCode: "medicine", Description: "人体系统与局部解剖", Keywords: []string{"解剖学"}},
 	{Code: "physiology", Name: "生理学", DisciplineCode: "medicine", Description: "人体各系统的功能与调节", Keywords: []string{"生理学"}},
 	{Code: "pathology", Name: "病理学", DisciplineCode: "medicine", Description: "疾病发生机制与病理变化", Keywords: []string{"病理学"}},
+	{Code: "pharmacology", Name: "药理学", DisciplineCode: "medicine", Description: "药物作用机制、代谢与不良反应", Keywords: []string{"药理学"}},
+	{Code: "internal-medicine", Name: "内科学", DisciplineCode: "medicine", Description: "常见内科疾病的诊断与治疗", Keywords: []string{"内科学", "内科"}},
 	{Code: "engineering-mechanics", Name: "工程力学", DisciplineCode: "engineering", Description: "静力学、材料力学与结构", Keywords: []string{"工程力学"}},
 	{Code: "circuit-theory", Name: "电路原理", DisciplineCode: "engineering", Description: "电路分析、网络定理与暂态", Keywords: []string{"电路", "电路原理"}},
 	{Code: "materials-science", Name: "材料科学基础", DisciplineCode: "engineering", Description: "晶体结构、相图与材料性能", Keywords: []string{"材料科学"}},
+	{Code: "electronics", Name: "电子技术", DisciplineCode: "engineering", Description: "模拟与数字电子电路", Keywords: []string{"电子技术", "模拟电子", "数字电子"}},
+	{Code: "control-theory", Name: "控制理论", DisciplineCode: "engineering", Description: "系统建模、反馈与稳定性", Keywords: []string{"控制理论", "自动控制"}},
+	{Code: "mechatronics", Name: "机电一体化", DisciplineCode: "engineering", Description: "机械、电子与控制的系统集成", Keywords: []string{"机电一体化", "机电"}},
+	{Code: "engineering-design", Name: "工程设计", DisciplineCode: "engineering", Description: "需求分析、方案设计、验证与迭代", Keywords: []string{"工程设计", "产品设计"}},
 	{Code: "music-theory", Name: "音乐理论", DisciplineCode: "art", Description: "乐理、和声与曲式", Keywords: []string{"音乐理论", "乐理"}},
 	{Code: "art-history", Name: "美术史", DisciplineCode: "art", Description: "中外美术史与作品鉴赏", Keywords: []string{"美术史"}},
+	{Code: "composition", Name: "作曲", DisciplineCode: "art", Description: "旋律、和声、复调与配器", Keywords: []string{"作曲", "作曲理论"}},
+	{Code: "film-studies", Name: "电影研究", DisciplineCode: "art", Description: "电影史、影像语言与批评", Keywords: []string{"电影研究", "影视艺术"}},
+	{Code: "digital-media", Name: "数字媒体", DisciplineCode: "art", Description: "数字影像、交互叙事与新媒体", Keywords: []string{"数字媒体", "新媒体艺术"}},
 }
 
 // DefaultKnowledgeEdges 默认先修关系。数学课按「基础 -> 分析 -> 专题 -> 应用」排列，
 // 机器学习依赖线性代数、概率论与高等数学，深度学习再依赖机器学习。
 var DefaultKnowledgeEdges = []KnowledgeEdgeSeed{
+	// 数学：基础 -> 分析/代数 -> 专题
 	{From: "calculus", To: "mathematical-analysis"},
 	{From: "calculus", To: "probability"},
 	{From: "analytic-geometry", To: "advanced-algebra"},
@@ -171,12 +216,139 @@ var DefaultKnowledgeEdges = []KnowledgeEdgeSeed{
 	{From: "real-analysis", To: "topology"},
 	{From: "mathematical-analysis", To: "numerical-analysis"},
 	{From: "linear-algebra", To: "numerical-analysis"},
+
+	// 计算机：基础 -> 系统课 -> 工程/分布式 -> 云
+	{From: "data-structures", To: "computer-architecture"},
+	{From: "data-structures", To: "operating-systems"},
+	{From: "data-structures", To: "computer-networks"},
+	{From: "data-structures", To: "database-systems"},
+	{From: "operating-systems", To: "software-engineering"},
+	{From: "database-systems", To: "software-engineering"},
+	{From: "operating-systems", To: "distributed-systems"},
+	{From: "computer-networks", To: "distributed-systems"},
+	{From: "software-engineering", To: "cloud-computing"},
+	{From: "distributed-systems", To: "cloud-computing"},
+
+	// 人工智能：机器学习依赖数学与数据结构，应用方向在此之上
 	{From: "linear-algebra", To: "machine-learning"},
 	{From: "probability", To: "machine-learning"},
 	{From: "calculus", To: "machine-learning"},
-	{From: "machine-learning", To: "deep-learning"},
-	{From: "linear-algebra", To: "deep-learning"},
 	{From: "data-structures", To: "machine-learning"},
+	{From: "machine-learning", To: "deep-learning"},
+	{From: "machine-learning", To: "natural-language-processing"},
+	{From: "machine-learning", To: "computer-vision"},
+	{From: "machine-learning", To: "reinforcement-learning"},
+
+	// 物理：普通物理 -> 四大力学 -> 凝聚态
+	{From: "college-physics", To: "mechanics"},
+	{From: "college-physics", To: "electromagnetism"},
+	{From: "college-physics", To: "thermodynamics"},
+	{From: "college-physics", To: "optics"},
+	{From: "mechanics", To: "quantum-mechanics"},
+	{From: "electromagnetism", To: "quantum-mechanics"},
+	{From: "thermodynamics", To: "statistical-mechanics"},
+	{From: "statistical-mechanics", To: "condensed-matter-physics"},
+	{From: "electromagnetism", To: "condensed-matter-physics"},
+
+	// 化学
+	{From: "inorganic-chemistry", To: "physical-chemistry"},
+	{From: "analytical-chemistry", To: "physical-chemistry"},
+	{From: "physical-chemistry", To: "polymer-chemistry"},
+	{From: "organic-chemistry", To: "polymer-chemistry"},
+	{From: "physical-chemistry", To: "computational-chemistry"},
+
+	// 生物
+	{From: "cell-biology", To: "biochemistry"},
+	{From: "cell-biology", To: "genetics"},
+	{From: "cell-biology", To: "molecular-biology"},
+	{From: "genetics", To: "molecular-biology"},
+	{From: "molecular-biology", To: "systems-biology"},
+	{From: "biochemistry", To: "systems-biology"},
+
+	// 天文 / 地理 / 环境
+	{From: "intro-astronomy", To: "astrophysics"},
+	{From: "astrophysics", To: "cosmology"},
+	{From: "physical-geography", To: "gis"},
+	{From: "human-geography", To: "regional-geography"},
+	{From: "gis", To: "regional-geography"},
+	{From: "intro-environmental-science", To: "environmental-chemistry"},
+	{From: "intro-environmental-science", To: "environmental-engineering"},
+	{From: "environmental-chemistry", To: "ecological-restoration"},
+	{From: "environmental-engineering", To: "ecological-restoration"},
+
+	// 经济 / 管理
+	{From: "microeconomics", To: "macroeconomics"},
+	{From: "macroeconomics", To: "finance"},
+	{From: "microeconomics", To: "international-economics"},
+	{From: "macroeconomics", To: "international-economics"},
+	{From: "macroeconomics", To: "econometrics"},
+	{From: "probability", To: "econometrics"},
+	{From: "management", To: "marketing"},
+	{From: "management", To: "organizational-behavior"},
+	{From: "marketing", To: "strategic-management"},
+	{From: "organizational-behavior", To: "strategic-management"},
+
+	// 法学 / 教育 / 心理
+	{From: "jurisprudence", To: "civil-law"},
+	{From: "jurisprudence", To: "criminal-law"},
+	{From: "civil-law", To: "civil-procedure"},
+	{From: "criminal-law", To: "criminal-procedure"},
+	{From: "pedagogy", To: "educational-psychology"},
+	{From: "pedagogy", To: "curriculum-and-instruction"},
+	{From: "curriculum-and-instruction", To: "educational-research"},
+	{From: "educational-psychology", To: "educational-research"},
+	{From: "general-psychology", To: "developmental-psychology"},
+	{From: "general-psychology", To: "cognitive-psychology"},
+	{From: "general-psychology", To: "social-psychology"},
+	{From: "social-psychology", To: "abnormal-psychology"},
+	{From: "cognitive-psychology", To: "abnormal-psychology"},
+
+	// 文学 / 历史 / 哲学
+	{From: "ancient-chinese-literature", To: "modern-chinese-literature"},
+	{From: "ancient-chinese-literature", To: "world-literature"},
+	{From: "world-literature", To: "literary-theory"},
+	{From: "world-literature", To: "comparative-literature"},
+	{From: "literary-theory", To: "comparative-literature"},
+	{From: "ancient-chinese-history", To: "modern-chinese-history"},
+	{From: "ancient-chinese-history", To: "world-history"},
+	{From: "world-history", To: "modern-world-history"},
+	{From: "ancient-chinese-history", To: "historiography"},
+	{From: "modern-chinese-history", To: "historiography"},
+	{From: "world-history", To: "historiography"},
+	{From: "modern-world-history", To: "historiography"},
+	{From: "chinese-philosophy", To: "ethics"},
+	{From: "western-philosophy", To: "ethics"},
+	{From: "western-philosophy", To: "epistemology"},
+	{From: "epistemology", To: "metaphysics"},
+	{From: "logic", To: "metaphysics"},
+
+	// 外语
+	{From: "college-english", To: "ielts"},
+	{From: "college-english", To: "linguistics"},
+	{From: "college-english", To: "translation"},
+	{From: "ielts", To: "translation"},
+
+	// 医学
+	{From: "anatomy", To: "physiology"},
+	{From: "physiology", To: "pathology"},
+	{From: "physiology", To: "pharmacology"},
+	{From: "pathology", To: "internal-medicine"},
+	{From: "pharmacology", To: "internal-medicine"},
+
+	// 工学
+	{From: "engineering-mechanics", To: "control-theory"},
+	{From: "circuit-theory", To: "electronics"},
+	{From: "circuit-theory", To: "control-theory"},
+	{From: "control-theory", To: "mechatronics"},
+	{From: "electronics", To: "mechatronics"},
+	{From: "mechatronics", To: "engineering-design"},
+	{From: "materials-science", To: "engineering-design"},
+
+	// 艺术
+	{From: "music-theory", To: "composition"},
+	{From: "art-history", To: "film-studies"},
+	{From: "film-studies", To: "digital-media"},
+	{From: "composition", To: "digital-media"},
 }
 
 // ComputeLevels 按先修关系推导每个知识点的层级：无先修为 1，其余为「先修层级最大值 + 1」。
@@ -356,6 +528,7 @@ func ComputeLevelsTolerant(codes []string, edges []KnowledgeEdgeSeed) map[string
 	}
 	return levels
 }
+
 //
 // 标题命中记 1.0、标签命中 0.6、描述命中 0.3，同一个关键词只取最高命中的字段；
 // 命中越多越接近 1。调用方用阈值（默认 0.5）过滤，即「标题或标签命中」才建立关联，
