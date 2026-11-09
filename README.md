@@ -59,7 +59,7 @@ cp -r data/snapshots/<run_id> ../../edurec-engine/dataset/platform_snapshot/<run
 # 3.engine 训练 + 推理
 cd ../../edurec-engine
 .venv/bin/python -m scripts.train_semantic --data-source platform --snapshot-dir dataset/platform_snapshot/<run_id>
-.venv/bin/python -m scripts.infer_batch    --data-source platform --snapshot-dir dataset/platform_snapshot/<run_id>
+.venv/bin/python -m scripts.run_batch_infer --data-source platform --snapshot-dir dataset/platform_snapshot/<run_id>
 
 # 4.结果拷回 platform
 cp model/recommendations.json ../edurec-platform/backend/data/recommendations.json

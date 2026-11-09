@@ -43,10 +43,10 @@ cd <platform>/backend && CONFIG_PATH=configs/config.yaml go run ./cmd/export_sna
 # ② 快照交给 engine（拷入 engine 的快照目录）
 cp -r data/snapshots/<run_id> <engine>/dataset/platform_snapshot/<run_id>/
 
-# ③ engine：训练 + 全量推理（统一入口 scripts.train_semantic / scripts.infer_batch，
+# ③ engine：训练 + 全量推理（统一入口 scripts.train_semantic / scripts.run_batch_infer，
 #    同一快照目录保证训练/推理口径一致）
-cd <engine> && python -m scripts.train_semantic --data-source platform --snapshot-dir dataset/platform_snapshot/<run_id>
-cd <engine> && python -m scripts.infer_batch    --data-source platform --snapshot-dir dataset/platform_snapshot/<run_id>
+cd <engine> && python -m scripts.train_semantic  --data-source platform --snapshot-dir dataset/platform_snapshot/<run_id>
+cd <engine> && python -m scripts.run_batch_infer --data-source platform --snapshot-dir dataset/platform_snapshot/<run_id>
 
 # ④ 推理结果放回 platform（旁挂信封 recommendations.meta.json 可选，含生成时间/分数/理由）
 cp <engine>/model/recommendations.json <platform>/backend/data/recommendations.json
