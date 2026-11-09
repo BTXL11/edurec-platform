@@ -83,6 +83,10 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*model
 		Email:        input.Email,
 		PasswordHash: string(passwordHash),
 		DisplayName:  input.DisplayName,
+		// Interests 是 JSON 列，必须写入合法 JSON：留空（零值 ""）会让 MySQL 直接
+		// 报 Error 3140（Invalid JSON text），注册接口 500。新用户先落一个空数组，
+		// 之后由 PUT /users/me/interests 覆盖。
+		Interests: "[]",
 	}
 	if err := s.users.Create(user); err != nil {
 		if errors.Is(err, repository.ErrDuplicate) {

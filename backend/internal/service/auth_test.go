@@ -147,6 +147,26 @@ func TestRegisterCreatesUser(t *testing.T) {
 	}
 }
 
+// TestRegisterInitializesEmptyInterests 锁住 users.interests 的写入形态。
+// 该列是 MySQL JSON 类型，写空串会触发 Error 3140（Invalid JSON text）→ 注册 500；
+// 新用户必须落一个合法 JSON 空数组，后续由 PUT /users/me/interests 覆盖。
+func TestRegisterInitializesEmptyInterests(t *testing.T) {
+	users := &fakeUserRepository{}
+	auth := newTestAuthService(users, newMemoryRefreshTokenStore())
+
+	user, err := auth.Register(context.Background(), service.RegisterInput{
+		Username: "lisi",
+		Email:    "lisi@example.com",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if user.Interests != "[]" {
+		t.Fatalf("Register() interests = %q, want %q", user.Interests, "[]")
+	}
+}
+
 func TestRegisterRejectsDuplicateUsername(t *testing.T) {
 	users := &fakeUserRepository{}
 	auth := newTestAuthService(users, newMemoryRefreshTokenStore())
