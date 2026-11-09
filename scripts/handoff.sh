@@ -54,6 +54,10 @@ if [ -z "${ENGINE_PYTHON:-}" ]; then
     fi
   done
 fi
+# engine 是 src-layout（包在 src/engine 下，靠 pip install -e . 或 PYTHONPATH 才能 import）。
+# 没有 .venv 时包并未安装，这里显式把 src 加进 PYTHONPATH，否则 -m scripts.* 会 ImportError。
+export PYTHONPATH="$ENGINE_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+
 CONFIG_PATH="${CONFIG_PATH:-configs/config.yaml}"
 SNAPSHOT_DIR="${SNAPSHOT_DIR:-data/snapshots}"
 BASE_URL="${BASE_URL:-http://localhost:8080}"
@@ -102,7 +106,7 @@ fi
 
 # [4] 全量推理
 log "[4] 全量推理"
-( cd "$ENGINE_ROOT" && "$ENGINE_PYTHON" -m scripts.infer_batch \
+( cd "$ENGINE_ROOT" && "$ENGINE_PYTHON" -m scripts.run_batch_infer \
     --data-source platform --snapshot-dir "dataset/platform_snapshot/$run_id" )
 
 # [5] 推理结果放回 platform
