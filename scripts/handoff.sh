@@ -9,7 +9,7 @@
 #
 # 前置条件：
 #   1. 后端服务器已启动（第 6 步经 HTTP 导入，需管理员账号）
-#   2. engine 已安装依赖（.venv 存在，即已 pip install -e .[dev]）
+#   2. engine 依赖可用：有 .venv 时优先用它，没有则用系统 Python（需装好 torch/numpy/pandas）
 #
 # 用法：
 #   bash scripts/handoff.sh                 # 完整一轮：导出 + 训练 + 推理 + 导入
@@ -17,6 +17,8 @@
 #
 # 可用环境变量覆盖：
 #   ENGINE_ROOT   engine 仓库根目录（默认 ../edurec-engine，与 platform 并列）
+#   ENGINE_PYTHON engine 的 Python 解释器（默认自动探测：.venv/Scripts/python.exe →
+#                 .venv/bin/python → 系统 python3/python/py，且要能真正执行）
 #   CONFIG_PATH   后端配置（默认 configs/config.yaml，相对 backend/）
 #   SNAPSHOT_DIR  快照输出目录（默认 data/snapshots，相对 backend/）
 #   BASE_URL      后端地址（默认 http://localhost:8080）
@@ -31,7 +33,27 @@ PLATFORM_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BACKEND_DIR="$PLATFORM_ROOT/backend"
 
 ENGINE_ROOT="${ENGINE_ROOT:-$PLATFORM_ROOT/../edurec-engine}"
-ENGINE_PYTHON="$ENGINE_ROOT/.venv/bin/python"
+
+# engine 解释器：显式 ENGINE_PYTHON 优先；否则依次探测 Windows/Linux 两种 venv 布局，
+# 都没有就退回系统 python。Windows 上 .venv 的解释器在 Scripts/ 而不是 bin/。
+if [ -z "${ENGINE_PYTHON:-}" ]; then
+  for cand in \
+    "$ENGINE_ROOT/.venv/Scripts/python.exe" \
+    "$ENGINE_ROOT/.venv/bin/python" \
+    "$ENGINE_ROOT/.venv/bin/python3"; do
+    if [ -x "$cand" ]; then ENGINE_PYTHON="$cand"; break; fi
+  done
+fi
+if [ -z "${ENGINE_PYTHON:-}" ]; then
+  # 只接受真正能执行起来的解释器：Windows 自带的 python3 大多是应用商店占位符，
+  # 「存在」但一跑就报错，所以这里用一次 -c 实测，而不是光看 command -v。
+  for cand in python3 python py; do
+    if command -v "$cand" >/dev/null 2>&1 && "$cand" -c 'import sys' >/dev/null 2>&1; then
+      ENGINE_PYTHON="$(command -v "$cand")"
+      break
+    fi
+  done
+fi
 CONFIG_PATH="${CONFIG_PATH:-configs/config.yaml}"
 SNAPSHOT_DIR="${SNAPSHOT_DIR:-data/snapshots}"
 BASE_URL="${BASE_URL:-http://localhost:8080}"
@@ -42,7 +64,7 @@ INFER_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --infer-only) INFER_ONLY=1 ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
     *) echo "未知参数: $arg" >&2; exit 2 ;;
   esac
 done
@@ -53,7 +75,7 @@ die() { echo "[handoff] 错误: $*" >&2; exit 1; }
 
 # ---- 前置检查 ---------------------------------------------------------------
 [ -d "$ENGINE_ROOT" ] || die "engine 目录不存在: $ENGINE_ROOT（可用 ENGINE_ROOT 覆盖）"
-[ -x "$ENGINE_PYTHON" ] || die "engine 依赖未安装: $ENGINE_ROOT/.venv/bin/python（先 cd $ENGINE_ROOT && pip install -e .[dev]）"
+[ -n "${ENGINE_PYTHON:-}" ] && [ -x "$ENGINE_PYTHON" ] || die "找不到可用的 Python 解释器（已探测 $ENGINE_ROOT/.venv 与系统 python；可用 ENGINE_PYTHON 指定）"
 [ -d "$BACKEND_DIR" ] || die "backend 目录不存在: $BACKEND_DIR"
 
 # [1] 导出快照
